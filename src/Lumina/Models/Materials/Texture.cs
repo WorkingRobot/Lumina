@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Lumina.Data.Files;
 using Lumina.Data.Parsing;
 
@@ -79,7 +79,7 @@ namespace Lumina.Models.Materials
                 return null;
             }
 
-            return _tex = data.GetFile< TexFile >( TexturePath );;
+            return _tex = data.GetFile< TexFile >( TexturePath );
         }
         
         /// <summary>

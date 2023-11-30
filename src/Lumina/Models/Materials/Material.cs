@@ -90,6 +90,13 @@ namespace Lumina.Models.Materials
             BuildMaterial();
         }
 
+        public Material( MtrlFile file, int variantId )
+        {
+            File = file;
+            VariantId = variantId;
+            BuildMaterial();
+        }
+
         /// <summary>
         /// Creates a new Material instance using the provided path and
         /// reference to game data. The Material will be built and then
@@ -101,6 +108,7 @@ namespace Lumina.Models.Materials
         public Material( GameData data, string path, int variantId = 1 )
         {
             MaterialPath = path;
+            VariantId = variantId;
             BuildMaterial();
             Update( data );
         }

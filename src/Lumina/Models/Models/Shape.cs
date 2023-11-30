@@ -42,7 +42,11 @@ namespace Lumina.Models.Models
         public Shape( Model model, Model.ModelLod lod, IReadOnlyList< ShapeMesh > shapeMeshes, int shapeIndex )
         {
             var currentShape = model.File.Shapes[ shapeIndex ];
-            Name   = model.StringOffsetToStringMap[ (int)currentShape.StringOffset ];
+            // handle cases where the name is not found in the StringOffsetToStringMap
+            if( model.StringOffsetToStringMap.TryGetValue( (int)currentShape.StringOffset, out var name ) )
+                Name = name;
+            else
+                Name = $"UnknownShape_{shapeIndex}";
             Meshes = new ShapeMesh[ currentShape.ShapeMeshCount[ (int)lod ] ];
             var end    = currentShape.ShapeMeshCount[ (int)lod ];
             var offset = currentShape.ShapeMeshStartIndex[ (int)lod ];
