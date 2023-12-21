@@ -58,7 +58,7 @@ namespace Lumina.Models.Models {
         /// <summary>
         /// The bone remapping table for this mesh.
         /// </summary>
-        public ushort[] BoneTable { get; private set; }
+        public string[]? BoneTable { get; private set; }
 
         /// <summary>
         /// The array of all vertices for this mesh.
@@ -107,8 +107,12 @@ namespace Lumina.Models.Models {
 
             // Copy over the bone table
             int boneTableIndex = currentMesh.BoneTableIndex;
-            if (boneTableIndex != 255)
-                BoneTable = Parent.File.BoneTables[ boneTableIndex ].BoneIndex;
+            if( boneTableIndex != 255 )
+            {
+                var boneTable = Parent.File.BoneTables[boneTableIndex];
+                var table = boneTable.BoneIndex.Take(boneTable.BoneCount);
+                BoneTable = table.Select( b => Parent.StringOffsetToStringMap[(int)Parent.File.BoneNameOffsets[b]] ).ToArray();
+            }
         }
 
         private void ReadIndices()
