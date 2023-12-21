@@ -93,5 +93,27 @@ namespace Lumina.Data
 
             return sb.ToString();
         }
+
+        /// <summary>
+        /// Load a defined file given a byte buffer
+        /// </summary>
+        /// <param name="data">An array of bytes with the file data</param>
+        /// <param name="origPath">The original file path in SqPack, required for reading some files (e.g. materials)</param>
+        /// <typeparam name="T">The type of <see cref="FileResource"/> to load the raw file in to</typeparam>
+        /// <returns>The requested file if found, null if not</returns>
+        public static T Load< T >( byte[] data, string? origPath = null, PlatformId platformId = PlatformId.Win32 ) where T : FileResource
+        {
+            var file = Activator.CreateInstance<T>();
+
+            file.Data = data;
+            if( origPath != null )
+            {
+                file.FilePath = GameData.ParseFilePath( origPath )!;
+            }
+            file.Reader = new( file.Data, platformId );
+            file.LoadFile();
+
+            return file;
+        }
     }
 }

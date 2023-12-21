@@ -205,16 +205,7 @@ namespace Lumina
 
             var fileContent = File.ReadAllBytes( path );
 
-            var file = Activator.CreateInstance< T >();
-            file.Data = fileContent;
-            if( origPath != null )
-            {
-                file.FilePath = ParseFilePath( origPath )!;
-            }
-            file.Reader = new LuminaBinaryReader( file.Data, Options.CurrentPlatform );
-            file.LoadFile();
-
-            return file;
+            return FileResource.Load<T>( fileContent, origPath, Options.CurrentPlatform );
         }
 
         /// <summary>
