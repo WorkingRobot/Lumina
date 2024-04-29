@@ -3,6 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using Lumina.Data.Files;
 using Lumina.Data.Structs;
+using Lumina.Extensions;
+
+#if NETSTANDARD
+using MathExt = Lumina.Extensions.MathExt;
+#else
+using MathExt = System.Math;
+#endif
 
 namespace Lumina.Data.Parsing.Tex.Buffers
 {
@@ -309,9 +316,9 @@ namespace Lumina.Data.Parsing.Tex.Buffers
 
             for( int i = 0; i < mipmapAllocations.Length; i++ )
             {
-                var log2width = Math.ILogB( width );
-                var log2height = Math.ILogB( height );
-                var log2depth = Math.ILogB( depth );
+                var log2width = MathExt.ILogB( width );
+                var log2height = MathExt.ILogB( height );
+                var log2depth = MathExt.ILogB( depth );
 
                 var srcOffset = 0;
                 var dstOffset = dstBaseOffset;

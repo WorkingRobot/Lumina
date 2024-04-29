@@ -1,4 +1,5 @@
 using System;
+using Lumina.Extensions;
 using Lumina.Text.Expressions;
 
 namespace Lumina.Text;

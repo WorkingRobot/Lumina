@@ -35,9 +35,9 @@ namespace Lumina.Text
         /// </summary>
         public SeString()
         {
-            _rawData = new Lazy< byte[] >( Array.Empty< byte >() );
-            _payloads = new Lazy< ImmutableList< BasePayload > >( ImmutableList< BasePayload >.Empty );
-            _rawString = new Lazy< string >( string.Empty );
+            _rawData = new Lazy< byte[] >( () => [] );
+            _payloads = new Lazy< ImmutableList< BasePayload > >( () => ImmutableList<BasePayload>.Empty );
+            _rawString = new Lazy< string >( () => string.Empty );
         }
 
         /// <summary>
@@ -46,7 +46,7 @@ namespace Lumina.Text
         /// <param name="data"></param>
         public SeString( byte[] data )
         {
-            _rawData = new Lazy< byte[] >( data );
+            _rawData = new Lazy< byte[] >( () => data );
             _payloads = new Lazy< ImmutableList< BasePayload > >( BuildPayloads );
             _rawString = new Lazy< string >( () => string.Concat( Payloads.Select( x => x.RawString ) ) );
         }
@@ -63,9 +63,9 @@ namespace Lumina.Text
             // if( data.IndexOf( (char)EndByte ) != -1 )
             //     throw new ArgumentException( "A string cannot embed a ETX as a part of the text." );
 
-            _payloads = new Lazy< ImmutableList< BasePayload > >( ImmutableList< BasePayload >.Empty );
-            _rawString = new Lazy< string >( data );
-            _rawData = new Lazy< byte[] >( Encoding.UTF8.GetBytes( _rawString.Value ) );
+            _payloads = new Lazy< ImmutableList< BasePayload > >( () => ImmutableList<BasePayload>.Empty );
+            _rawString = new Lazy< string >( () => data );
+            _rawData = new Lazy< byte[] >( () => Encoding.UTF8.GetBytes( _rawString.Value ) );
         }
 
         /// <summary>
@@ -75,7 +75,8 @@ namespace Lumina.Text
         /// </summary>
         public SeString( IEnumerable< object? > payloads )
         {
-            _payloads = new Lazy< ImmutableList< BasePayload > >( payloads.Select( x => x as BasePayload ?? new TextPayload(Encoding.UTF8.GetBytes(x?.ToString() ?? "(null)")) ).ToImmutableList() );
+            var __payloads = payloads.Select( x => x as BasePayload ?? new TextPayload( Encoding.UTF8.GetBytes( x?.ToString() ?? "(null)" ) ) ).ToImmutableList();
+            _payloads = new Lazy< ImmutableList< BasePayload > >( () => __payloads );
             _rawString = new Lazy< string >( () => string.Concat( Payloads.Select( x => x.RawString ) ) );
             _rawData = new Lazy< byte[] >( () =>
             {

@@ -3,6 +3,10 @@ using System.Numerics;
 using Lumina.Text.Expressions;
 using Lumina.Text.Payloads;
 
+#if NETSTANDARD
+using Math = Lumina.Extensions.MathExt;
+#endif
+
 namespace Lumina.Text;
 
 /// <summary>A builder for <see cref="SeString"/>.</summary>

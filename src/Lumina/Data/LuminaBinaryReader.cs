@@ -10,6 +10,12 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
+#if NETSTANDARD
+using BitConverterExt = Lumina.Extensions.BitConverterExt;
+#else
+using BitConverterExt = System.BitConverter;
+#endif
+
 namespace Lumina.Data
 {
     public class LuminaBinaryReader : BinaryReader
@@ -226,10 +232,10 @@ namespace Lumina.Data
 
         public static float ReverseEndianness( float value )
         {
-            var iValue = BitConverter.SingleToInt32Bits( value );
+            var iValue = BitConverterExt.SingleToInt32Bits( value );
             iValue = BinaryPrimitives.ReverseEndianness( iValue );
 
-            return BitConverter.Int32BitsToSingle( iValue );
+            return BitConverterExt.Int32BitsToSingle( iValue );
         }
 
         public static double ReverseEndianness( double value )

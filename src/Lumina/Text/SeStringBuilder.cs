@@ -6,6 +6,10 @@ using Lumina.Text.Payloads;
 using Lumina.Text.ReadOnly;
 using Microsoft.Extensions.ObjectPool;
 
+#if NETSTANDARD
+using Enum = Lumina.Extensions.EnumExt;
+#endif
+
 namespace Lumina.Text;
 
 /// <summary>A builder for <see cref="SeString"/>.</summary>

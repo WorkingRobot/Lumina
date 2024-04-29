@@ -1,3 +1,4 @@
+using Lumina.Extensions;
 using System;
 using System.IO;
 using System.Linq;

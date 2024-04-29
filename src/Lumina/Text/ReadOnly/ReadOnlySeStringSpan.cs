@@ -5,7 +5,14 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using Lumina.Extensions;
 using Lumina.Text.Payloads;
+
+#if NETSTANDARD
+using MemoryMarshal = Lumina.Extensions.MemoryMarshalExt;
+#else
+using MemoryMarshal = System.Runtime.InteropServices.MemoryMarshal;
+#endif
 
 namespace Lumina.Text.ReadOnly;
 

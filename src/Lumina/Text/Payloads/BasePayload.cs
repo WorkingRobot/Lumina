@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Lumina.Text.Expressions;
+using Lumina.Extensions;
 
 namespace Lumina.Text.Payloads
 {
@@ -31,9 +32,9 @@ namespace Lumina.Text.Payloads
         public BasePayload()
         {
             _expressionTotalSize = new IntegerExpression( 0 );
-            _expressions = new Lazy< ImmutableList< BaseExpression > >( ImmutableList< BaseExpression >.Empty );
-            _data = Array.Empty< byte >();
-            _rawString = new Lazy< string >( string.Empty );
+            _expressions = new Lazy< ImmutableList< BaseExpression > >( () => ImmutableList< BaseExpression >.Empty );
+            _data = [];
+            _rawString = new Lazy< string >( () => string.Empty );
             PayloadType = PayloadType.Text;
         }
 
@@ -57,7 +58,8 @@ namespace Lumina.Text.Payloads
             if( payloadType == PayloadType.Text )
                 throw new ArgumentException( "Text payload cannot be constructed with this constructor.", nameof( payloadType ) );
             
-            _expressions = new Lazy< ImmutableList< BaseExpression > >( expressions.ToImmutableList() );
+            var __expressions = expressions.ToImmutableList();
+            _expressions = new Lazy< ImmutableList< BaseExpression > >( () => __expressions );
             _expressionTotalSize = new IntegerExpression( (uint)_expressions.Value.Select( x => x.Size ).Sum() );
             
             _data = new byte[1 + 1 + _expressionTotalSize.Size + _expressionTotalSize.Value + 1];
@@ -73,7 +75,7 @@ namespace Lumina.Text.Payloads
 
             if( PayloadType == PayloadType.NewLine )
             {
-                _rawString = new Lazy< string >( "\n" );
+                _rawString = new Lazy< string >( () => "\n" );
             }
             else
             {
@@ -111,7 +113,7 @@ namespace Lumina.Text.Payloads
                 // This is a simple text payload.
 
                 _expressionTotalSize = new IntegerExpression( 0 );
-                _expressions = new Lazy< ImmutableList< BaseExpression > >( ImmutableList< BaseExpression >.Empty );
+                _expressions = new Lazy< ImmutableList< BaseExpression > >( () => ImmutableList< BaseExpression >.Empty );
 
                 var outStream = new MemoryStream();
                 var buffer = ArrayPool< byte >.Shared.Rent( 4096 );
@@ -183,7 +185,7 @@ namespace Lumina.Text.Payloads
 
                 if( PayloadType == PayloadType.NewLine )
                 {
-                    _rawString = new Lazy< string >( "\n" );
+                    _rawString = new Lazy< string >( () => "\n" );
                 }
                 else
                 {
@@ -252,7 +254,7 @@ namespace Lumina.Text.Payloads
             if( Expressions.Count == 0 )
                 return $"<{encodeName}>";
 
-            return $"<{encodeName}({string.Join( ',', Expressions.Select(
+            return $"<{encodeName}({string.Join( ",", Expressions.Select(
                 ex => ex is StringExpression se ? se.Value.ToMacroString() : ex.ToString()
             ) )})>";
         }

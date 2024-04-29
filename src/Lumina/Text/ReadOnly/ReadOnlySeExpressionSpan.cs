@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Lumina.Extensions;
 using Lumina.Text.Expressions;
 
 namespace Lumina.Text.ReadOnly;

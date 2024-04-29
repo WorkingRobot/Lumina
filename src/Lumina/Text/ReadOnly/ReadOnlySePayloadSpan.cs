@@ -4,7 +4,12 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Lumina.Extensions;
 using Lumina.Text.Payloads;
+
+#if NETSTANDARD
+using Enum = Lumina.Extensions.EnumExt;
+#endif
 
 namespace Lumina.Text.ReadOnly;
 
