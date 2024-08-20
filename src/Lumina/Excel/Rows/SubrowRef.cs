@@ -1,14 +1,15 @@
 using System;
+using Lumina.Excel.Sheets;
 
-namespace Lumina.Excel;
+namespace Lumina.Excel.Rows;
 
 /// <summary>
-/// A helper type to concretely reference a collection of subrows in a specific excel sheet.
+/// A helper type to concretely reference a collection of subrows in a specific Excel sheet.
 /// </summary>
 /// <typeparam name="T">The subrow type referenced by the subrows of <see cref="RowId"/>.</typeparam>
 /// <param name="module">The <see cref="ExcelModule"/> to read sheet data from.</param>
 /// <param name="rowId">The referenced row id.</param>
-public readonly struct SubrowRef< T >( ExcelModule? module, uint rowId ) where T : struct, IExcelSubrow< T >
+public readonly struct SubrowRef< T >( ExcelModule? module, uint rowId ) where T : struct, IExcelRow< T >
 {
     private readonly SubrowExcelSheet< T >? _sheet = module?.GetSubrowSheet< T >();
 
@@ -26,12 +27,12 @@ public readonly struct SubrowRef< T >( ExcelModule? module, uint rowId ) where T
     /// The referenced row value itself.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="IsValid"/> is false.</exception>
-    public SubrowCollection< T > Value => ValueNullable ?? throw new InvalidOperationException();
+    public SubrowExcelSheet< T >.SubrowCollection Value => ValueNullable ?? throw new InvalidOperationException();
 
     /// <summary>
     /// Attempts to get the referenced row value. Is <see langword="null"/> if it does not exist in the sheet.
     /// </summary>
-    public SubrowCollection< T >? ValueNullable => _sheet?.GetRowOrDefault( rowId );
+    public SubrowExcelSheet< T >.SubrowCollection? ValueNullable => _sheet?.GetRowOrDefault( rowId );
 
     private RowRef ToGeneric() => RowRef.CreateSubrow< T >( module, rowId );
 

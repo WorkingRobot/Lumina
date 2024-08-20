@@ -6,9 +6,9 @@ using System.Runtime.CompilerServices;
 namespace Lumina.Excel;
 
 /// <summary>
-/// A collection helper used to layout and structure excel rows.
+/// A collection helper used to layout and structure Excel rows.
 /// </summary>
-/// <remarks>Mostly an implementation detail for reading excel rows. This type does not store or hold any row data, and is therefore lightweight and trivially constructable.</remarks>
+/// <remarks>Mostly an implementation detail for reading Excel rows. This type does not store or hold any row data, and is therefore lightweight and trivially constructable.</remarks>
 /// <typeparam name="T">A type that wraps a group of fields inside a row.</typeparam>
 public readonly struct Collection< T >( ExcelPage page, uint parentOffset, uint offset, Func< ExcelPage, uint, uint, uint, T > ctor, int size )
     : IList< T >, IReadOnlyList< T > where T : struct

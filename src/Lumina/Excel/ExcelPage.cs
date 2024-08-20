@@ -9,10 +9,10 @@ using System.Runtime.InteropServices;
 namespace Lumina.Excel;
 
 /// <summary>
-/// A single page/file of data from an excel sheet.
+/// A single page/file of data from an Excel sheet.
 /// </summary>
 /// <remarks>
-/// If you only want to read excel sheets, please refrain from touching this class. This class exists mostly as an implementation detail for parsing excel rows.
+/// If you only want to read Excel sheets, please refrain from touching this class. This class exists mostly as an implementation detail for parsing Excel rows.
 /// </remarks>
 [EditorBrowsable( EditorBrowsableState.Advanced )]
 public sealed class ExcelPage

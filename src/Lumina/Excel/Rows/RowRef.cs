@@ -1,9 +1,10 @@
 using System;
+using Lumina.Excel.Sheets;
 
-namespace Lumina.Excel;
+namespace Lumina.Excel.Rows;
 
 /// <summary>
-/// A helper type to concretely reference a row in a specific excel sheet.
+/// A helper type to concretely reference a row in a specific Excel sheet.
 /// </summary>
 /// <typeparam name="T">The row type referenced by the <see cref="RowId"/>.</typeparam>
 /// <param name="module">The <see cref="ExcelModule"/> to read sheet data from.</param>
