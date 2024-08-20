@@ -76,7 +76,7 @@ public class ExcelModule
                             new Lazy< RawExcelSheet >?[numLanguageSlots],
                             new ConcurrentDictionary< Type, Array >?[numLanguageSlots] );
                     },
-                    StringComparer.InvariantCultureIgnoreCase );
+                    StringComparer.OrdinalIgnoreCase );
 
         foreach( var (headerFile, sheets, rowCaches) in _definedSheets.Values )
         {
@@ -92,7 +92,7 @@ public class ExcelModule
             }
         }
 
-        _adhocSheets = new( StringComparer.InvariantCultureIgnoreCase );
+        _adhocSheets = new( StringComparer.OrdinalIgnoreCase );
         SheetNames = [.. files.ExdMap.Keys];
     }
 
