@@ -10,7 +10,6 @@ namespace Lumina.Excel.Sheets;
 /// <summary>A typed Excel sheet of <see cref="ExcelVariant.Subrows"/> variant that wraps around a <see cref="RawSubrowExcelSheet"/>.</summary>
 /// <typeparam name="T">Type of the rows contained within.</typeparam>
 public readonly partial struct SubrowExcelSheet< T >
-    where T : struct, IExcelRow< T >
 {
     /// <summary>Collection of subrows under one row.</summary>
     public readonly struct SubrowCollection : IList< T >, IReadOnlyList< T >

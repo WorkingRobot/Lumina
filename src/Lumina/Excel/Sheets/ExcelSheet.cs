@@ -11,7 +11,7 @@ namespace Lumina.Excel.Sheets;
 
 /// <summary>A typed Excel sheet of <see cref="ExcelVariant.Default"/> variant that wraps around a <see cref="RawExcelSheet"/>.</summary>
 /// <typeparam name="T">Type of the rows contained within.</typeparam>
-public readonly struct ExcelSheet< T > : IExcelSheet, ICollection< T >, IReadOnlyCollection< T > where T : struct, IExcelRow< T >
+public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, IReadOnlyCollection< T > where T : struct, IExcelRow< T >
 {
     /// <summary>Creates a new instance of <see cref="ExcelSheet{T}"/>, deducing column hash from <see cref="SheetAttribute"/> of <see cref="T"/> if available.
     /// </summary>
@@ -165,39 +165,4 @@ public readonly struct ExcelSheet< T > : IExcelSheet, ICollection< T >, IReadOnl
     /// <param name="lookup">Lookup data for the desired row.</param>
     /// <returns>A new instance of <typeparamref name="T"/>.</returns>
     private T UnsafeCreateRow( scoped ref readonly RawExcelRow lookup ) => T.Create( lookup );
-
-    /// <summary>Represents an enumerator that iterates over all rows in a <see cref="ExcelSheet{T}"/>.</summary>
-    /// <param name="sheet">The sheet to iterate over.</param>
-    public struct Enumerator( ExcelSheet< T > sheet ) : IEnumerator< T >
-    {
-        private int _index = -1;
-
-        /// <inheritdoc cref="IEnumerator{T}.Current"/>
-        public T Current { get; private set; }
-
-        readonly object IEnumerator.Current => Current;
-
-        /// <inheritdoc/>
-        public bool MoveNext()
-        {
-            if( ++_index < sheet.Count )
-            {
-                // UnsafeCreateRowAt must be called only when the preconditions are validated.
-                // If it is to be called on-demand from get_Current, then it may end up being called with invalid parameters,
-                // so we create the instance in advance here.
-                Current = sheet.UnsafeCreateRowAt( _index );
-                return true;
-            }
-
-            --_index;
-            return false;
-        }
-
-        /// <inheritdoc/>
-        public void Reset() => _index = -1;
-
-        /// <inheritdoc/>
-        public readonly void Dispose()
-        { }
-    }
 }
