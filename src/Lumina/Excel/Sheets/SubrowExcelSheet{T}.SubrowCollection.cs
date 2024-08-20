@@ -15,11 +15,13 @@ public readonly partial struct SubrowExcelSheet< T >
     public readonly struct SubrowCollection : IList< T >, IReadOnlyList< T >
     {
         private readonly RawExcelRow _rawRow;
+        private readonly int _rowIndex;
 
-        internal SubrowCollection( SubrowExcelSheet< T > sheet, scoped ref readonly RawExcelRow rawRow )
+        internal SubrowCollection( SubrowExcelSheet< T > sheet, scoped ref readonly RawExcelRow rawRow, int rowIndex )
         {
             Sheet = sheet;
             _rawRow = rawRow;
+            _rowIndex = rowIndex;
         }
 
         /// <summary>Gets the associated sheet.</summary>
@@ -39,7 +41,7 @@ public readonly partial struct SubrowExcelSheet< T >
             get {
                 ArgumentOutOfRangeException.ThrowIfNegative( index );
                 ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( index, Count );
-                return Sheet.UnsafeCreateSubrow( in _rawRow, unchecked( (ushort) index ) );
+                return Sheet.UnsafeCreateSubrow( _rowIndex, unchecked( (ushort) index ), in _rawRow );
             }
         }
 
@@ -65,7 +67,7 @@ public readonly partial struct SubrowExcelSheet< T >
             if( item.RawRow != _rawRow )
                 return -1;
 
-            var row = Sheet.UnsafeCreateSubrow( in _rawRow, item.RawRow.SubrowId );
+            var row = Sheet.UnsafeCreateSubrow( _rowIndex, item.RawRow.SubrowId, in _rawRow );
             return EqualityComparer< T >.Default.Equals( item, row ) ? item.RawRow.SubrowId : -1;
         }
 
@@ -80,7 +82,7 @@ public readonly partial struct SubrowExcelSheet< T >
             if( Count > array.Length - arrayIndex )
                 throw new ArgumentException( "The number of elements in the source list is greater than the available space." );
             for( var i = 0; i < Count; i++ )
-                array[ arrayIndex++ ] = Sheet.UnsafeCreateSubrow( in _rawRow, unchecked( (ushort) i ) );
+                array[ arrayIndex++ ] = Sheet.UnsafeCreateSubrow( _rowIndex, unchecked( (ushort) i ), in _rawRow );
         }
 
         /// <inheritdoc cref="IEnumerable{T}.GetEnumerator"/>
@@ -91,7 +93,7 @@ public readonly partial struct SubrowExcelSheet< T >
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         /// <inheritdoc/>
-        public override string ToString() => $"{nameof(SubrowCollection)}({Sheet.Name}#{RowId}, {Count} items)";
+        public override string ToString() => $"{nameof( SubrowCollection )}({Sheet.Name}#{RowId}, {Count} items)";
 
         /// <summary>Enumerator that enumerates over subrows under one row.</summary>
         /// <param name="subrowCollection">Subrow collection to iterate over.</param>
@@ -112,7 +114,7 @@ public readonly partial struct SubrowExcelSheet< T >
                     // UnsafeCreateSubrow must be called only when the preconditions are validated.
                     // If it is to be called on-demand from get_Current, then it may end up being called with invalid parameters,
                     // so we create the instance in advance here.
-                    Current = subrowCollection.Sheet.UnsafeCreateSubrow( in subrowCollection._rawRow, unchecked( (ushort) _index ) );
+                    Current = subrowCollection.Sheet.UnsafeCreateSubrow( subrowCollection._rowIndex, unchecked( (ushort) _index ), in subrowCollection._rawRow );
                     return true;
                 }
 
@@ -128,7 +130,7 @@ public readonly partial struct SubrowExcelSheet< T >
             { }
 
             /// <inheritdoc/>
-            public override string ToString() => $"{nameof(Enumerator)}({_index}/{subrowCollection.Count} for {subrowCollection})";
+            public override string ToString() => $"{nameof( Enumerator )}({_index}/{subrowCollection.Count} for {subrowCollection})";
         }
     }
 }

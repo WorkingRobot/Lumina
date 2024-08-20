@@ -301,7 +301,7 @@ namespace Lumina
         /// </remarks>
         /// <exception cref="SheetNameEmptyException">Sheet name was not specified neither via <typeparamref name="T"/>'s <see cref="SheetAttribute.Name"/> nor <paramref name="name"/>.</exception>
         /// <exception cref="SheetAttributeMissingException"><typeparamref name="T"/> does not have a valid <see cref="SheetAttribute"/>.</exception>
-        public ExcelSheet< T >? GetExcelSheet< T >( Language? language = null, string? name = null ) where T : struct, IExcelRow< T >
+        public ExcelSheet< T >? GetExcelSheet< T >( Language? language = null, string? name = null ) where T : IExcelRow< T >
         {
             try
             {
@@ -315,7 +315,7 @@ namespace Lumina
 
         /// <summary>Loads a <see cref="SubrowExcelSheet{T}"/>. Returns <see langword="null"/> if the sheet does not exist, has an invalid column hash or unsupported variant, or was requested with an unsupported language.</summary>
         /// <inheritdoc cref="GetExcelSheet{T}(Nullable{Language}, string?)"/>
-        public SubrowExcelSheet< T >? GetSubrowExcelSheet< T >( Language? language = null, string? name = null ) where T : struct, IExcelRow< T >
+        public SubrowExcelSheet< T >? GetSubrowExcelSheet< T >( Language? language = null, string? name = null ) where T : IExcelRow< T >
         {
             try
             {

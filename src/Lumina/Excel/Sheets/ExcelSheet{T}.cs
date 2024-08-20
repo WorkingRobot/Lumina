@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Threading;
 using Lumina.Data;
 using Lumina.Data.Structs.Excel;
 using Lumina.Excel.Exceptions;
@@ -11,31 +14,42 @@ namespace Lumina.Excel.Sheets;
 
 /// <summary>A typed Excel sheet of <see cref="ExcelVariant.Default"/> variant that wraps around a <see cref="RawExcelSheet"/>.</summary>
 /// <typeparam name="T">Type of the rows contained within.</typeparam>
-public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, IReadOnlyCollection< T > where T : struct, IExcelRow< T >
+public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, IReadOnlyCollection< T > where T : IExcelRow< T >
 {
+    private readonly object?[]? _rowCache;
+
     /// <summary>Creates a new instance of <see cref="ExcelSheet{T}"/>, deducing column hash from <see cref="SheetAttribute"/> of <see cref="T"/> if available.
     /// </summary>
     /// <param name="rawSheet">Raw sheet to base this sheet on.</param>
+    /// <param name="rowCache">Row cache to use, if <typeparamref name="T"/> is a reference type.</param>
     /// <exception cref="MismatchedColumnHashException">Column hash deduced from sheet attribute was invalid (hash mismatch).</exception>
     /// <exception cref="NotSupportedException">Header file had a <see cref="ExcelVariant"/> value that is not supported.</exception>
     /// <returns>A new instance of <see cref="ExcelSheet{T}"/>.</returns>
-    public ExcelSheet( RawExcelSheet rawSheet )
-        : this( rawSheet, rawSheet.Module.GetSheetAttributes< T >()?.ColumnHash )
+    public ExcelSheet( RawExcelSheet rawSheet, object?[]? rowCache = null )
+        : this( rawSheet, rawSheet.Module.GetSheetAttributes< T >()?.ColumnHash, rowCache )
     { }
 
     /// <summary>Creates a new instance of <see cref="ExcelSheet{T}"/>.</summary>
     /// <param name="rawSheet">Raw sheet to base this sheet on.</param>
     /// <param name="columnHash">Hash of the columns in the sheet. If <see langword="null"/>, it will not check the hash.</param>
+    /// <param name="rowCache">Row cache to use, if <typeparamref name="T"/> is a reference type.</param>
     /// <exception cref="MismatchedColumnHashException"><paramref name="columnHash"/> was invalid (hash mismatch).</exception>
     /// <exception cref="NotSupportedException">Header file had a <see cref="ExcelVariant"/> value that is not supported.</exception>
     /// <returns>A new instance of <see cref="ExcelSheet{T}"/>.</returns>
-    public ExcelSheet( RawExcelSheet rawSheet, uint? columnHash )
+    public ExcelSheet( RawExcelSheet rawSheet, uint? columnHash, object?[]? rowCache = null )
     {
+        if( typeof( T ).IsValueType )
+            rowCache = null;
+
         if( rawSheet.Variant != ExcelVariant.Default )
             throw new NotSupportedException( $"Sheet is not of {nameof( ExcelVariant.Default )} variant." );
         if( columnHash is not null && columnHash.Value != rawSheet.ColumnHash )
             throw new MismatchedColumnHashException( rawSheet.ColumnHash, columnHash.Value, nameof( columnHash ) );
+        if( rowCache is not null && rowCache.Length < rawSheet.Count )
+            throw new ArgumentException( "Size of cache must be at least the number of rows in the sheet.", nameof( rowCache ) );
+
         RawSheet = rawSheet;
+        _rowCache = rowCache;
     }
 
     /// <summary>Gets the raw sheet this typed sheet is based on.</summary>
@@ -81,10 +95,12 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     /// </summary>
     /// <param name="rowId">The row id to get.</param>
     /// <returns>A nullable row object. Returns <see langword="null"/> if the row does not exist.</returns>
+    /// <remarks>In case <typeparamref name="T"/> is a value type (<see langword="struct"/>), you can use <see cref="ExcelRowExtensions.AsNullable{T}"/> to
+    /// convert it to a <see cref="Nullable{T}"/>-wrapped type.</remarks>
     public T? GetRowOrDefault( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
-        return Unsafe.IsNullRef( in lookup ) ? null : UnsafeCreateRow( in lookup );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        return Unsafe.IsNullRef( in lookup ) ? default : UnsafeCreateRow( rowIndex, in lookup );
     }
 
     /// <summary>
@@ -93,16 +109,16 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     /// <param name="rowId">The row id to get.</param>
     /// <param name="row">The output row object.</param>
     /// <returns><see langword="true"/> if the row exists and <paramref name="row"/> is written to and <see langword="false"/> otherwise.</returns>
-    public bool TryGetRow( uint rowId, out T row )
+    public bool TryGetRow( uint rowId, [MaybeNullWhen( false )] out T row )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) )
         {
             row = default;
             return false;
         }
 
-        row = UnsafeCreateRow( in lookup );
+        row = UnsafeCreateRow( rowIndex, in lookup );
         return true;
     }
 
@@ -114,8 +130,8 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     /// <exception cref="ArgumentOutOfRangeException">Throws when the row id does not have a row attached to it.</exception>
     public T GetRow( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
-        return Unsafe.IsNullRef( in lookup ) ? throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null ) : UnsafeCreateRow( in lookup );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        return Unsafe.IsNullRef( in lookup ) ? throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null ) : UnsafeCreateRow( rowIndex, in lookup );
     }
 
     /// <summary>
@@ -142,8 +158,10 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
         ArgumentOutOfRangeException.ThrowIfNegative( arrayIndex );
         if( Count > array.Length - arrayIndex )
             throw new ArgumentException( "The number of elements in the source list is greater than the available space." );
+
+        var rowIndex = 0;
         foreach( var lookup in OffsetLookupTable )
-            array[ arrayIndex++ ] = UnsafeCreateRow( in lookup );
+            array[ arrayIndex++ ] = UnsafeCreateRow( rowIndex++, in lookup );
     }
 
     void ICollection< T >.Add( T item ) => throw new NotSupportedException();
@@ -165,10 +183,21 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     /// <summary>Creates a row at the given index, without checking for bounds or preconditions.</summary>
     /// <param name="rowIndex">Index of the desired row.</param>
     /// <returns>A new instance of <typeparamref name="T"/>.</returns>
-    private T UnsafeCreateRowAt( int rowIndex ) => UnsafeCreateRow( in RawSheet.UnsafeGetRowLookupAt( rowIndex ) );
+    private T UnsafeCreateRowAt( int rowIndex ) => UnsafeCreateRow( rowIndex, in RawSheet.UnsafeGetRowLookupAt( rowIndex ) );
 
     /// <summary>Creates a row using the given lookup data, without checking for bounds or preconditions.</summary>
-    /// <param name="lookup">Lookup data for the desired row.</param>
+    /// <param name="rowIndex">Index of the desired row.</param>
+    /// <param name="row">Lookup data for the desired row.</param>
     /// <returns>A new instance of <typeparamref name="T"/>.</returns>
-    private T UnsafeCreateRow( scoped ref readonly RawExcelRow lookup ) => T.Create( lookup );
+    private T UnsafeCreateRow( int rowIndex, scoped ref readonly RawExcelRow row )
+    {
+        if( _rowCache is null )
+            return T.Create( row );
+
+        ref var slot = ref Unsafe.Add( ref MemoryMarshal.GetArrayDataReference( _rowCache ), rowIndex );
+        if( slot is null )
+            Interlocked.CompareExchange( ref slot, T.Create( row ), null );
+
+        return (T) slot;
+    }
 }

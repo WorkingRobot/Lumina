@@ -9,30 +9,23 @@ namespace Lumina.Excel.Rows;
 /// <typeparam name="T">The subrow type referenced by the subrows of <see cref="RowId"/>.</typeparam>
 /// <param name="module">The <see cref="ExcelModule"/> to read sheet data from.</param>
 /// <param name="rowId">The referenced row id.</param>
-public readonly struct SubrowRef< T >( ExcelModule? module, uint rowId ) where T : struct, IExcelRow< T >
+public readonly struct SubrowRef< T >( ExcelModule? module, uint rowId ) where T : IExcelRow< T >
 {
     private readonly SubrowExcelSheet< T >? _sheet = module?.GetSubrowSheet< T >();
 
-    /// <summary>
-    /// The row id of the referenced row.
-    /// </summary>
+    /// <summary>Gets the ID of the referenced row.</summary>
     public uint RowId => rowId;
 
-    /// <summary>
-    /// Whether the <see cref="RowId"/> exists in the sheet.
-    /// </summary>
+    /// <summary>Gets a value indicating whether the <see cref="RowId"/> exists in the sheet.</summary>
     public bool IsValid => _sheet?.HasRow( RowId ) ?? false;
 
-    /// <summary>
-    /// The referenced row value itself.
-    /// </summary>
+    /// <summary>Gets the referenced row as a subrow collection.</summary>
     /// <exception cref="InvalidOperationException">Thrown if <see cref="IsValid"/> is false.</exception>
-    public SubrowExcelSheet< T >.SubrowCollection Value => ValueNullable ?? throw new InvalidOperationException();
+    public SubrowExcelSheet< T >.SubrowCollection Value => ValueOrDefault ?? throw new InvalidOperationException();
 
-    /// <summary>
-    /// Attempts to get the referenced row value. Is <see langword="null"/> if it does not exist in the sheet.
-    /// </summary>
-    public SubrowExcelSheet< T >.SubrowCollection? ValueNullable => _sheet?.GetRowOrDefault( rowId );
+    /// <summary>Gets the referenced row as a subrow collection, if possible.</summary>
+    /// <value>Instance of <typeparamref name="T"/> if corresponding row could be found; <see langword="default"/> otherwise.</value>
+    public SubrowExcelSheet< T >.SubrowCollection? ValueOrDefault => _sheet?.GetRowOrDefault( rowId );
 
     /// <inheritdoc/>
     public override string ToString() => $"{nameof(SubrowRef<T>)}({typeof( T ).Name}#{rowId})";

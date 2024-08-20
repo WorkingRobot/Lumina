@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Lumina.Data;
 using Lumina.Excel.Sheets;
 
@@ -30,11 +31,11 @@ public readonly struct RowRef( ExcelModule? module, uint rowId, Type? rowType )
     /// </summary>
     /// <typeparam name="T">The row type/schema to check against.</typeparam>
     /// <returns>Whether this <see cref="RowRef"/> points to a <typeparamref name="T"/>.</returns>
-    public bool Is< T >() where T : struct, IExcelRow< T > =>
+    public bool Is< T >() where T : IExcelRow< T > =>
         typeof( T ) == rowType;
 
     /// <inheritdoc cref="Is{T}"/>
-    public bool IsSubrow< T >() where T : struct, IExcelRow< T > =>
+    public bool IsSubrow< T >() where T : IExcelRow< T > =>
         typeof( T ) == rowType;
 
     /// <summary>
@@ -42,21 +43,23 @@ public readonly struct RowRef( ExcelModule? module, uint rowId, Type? rowType )
     /// </summary>
     /// <typeparam name="T">The row type/schema to check against.</typeparam>
     /// <returns>The referenced row type. Returns null if this <see cref="RowRef"/> does not point to a <typeparamref name="T"/> or if the <see cref="RowId"/> does not exist in its sheet.</returns>
-    public T? GetValueOrDefault< T >() where T : struct, IExcelRow< T >
+    /// <remarks>In case <typeparamref name="T"/> is a value type (<see langword="struct"/>), you can use <see cref="ExcelRowExtensions.AsNullable{T}"/> to
+    /// convert it to a <see cref="Nullable{T}"/>-wrapped type.</remarks>
+    public T? GetValueOrDefault< T >() where T : IExcelRow< T >
     {
         if( !Is< T >() || module is null )
-            return null;
+            return default;
 
-        return new RowRef< T >( module, rowId ).ValueNullable;
+        return new RowRef< T >( module, rowId ).ValueOrDefault;
     }
 
     /// <inheritdoc cref="GetValueOrDefault{T}"/>
-    public SubrowExcelSheet< T >.SubrowCollection? GetValueOrDefaultSubrow< T >() where T : struct, IExcelRow< T >
+    public SubrowExcelSheet< T >.SubrowCollection? GetValueOrDefaultSubrow< T >() where T : IExcelRow< T >
     {
         if( !IsSubrow< T >() || module is null )
             return null;
 
-        return new SubrowRef< T >( module, rowId ).ValueNullable;
+        return new SubrowRef< T >( module, rowId ).ValueOrDefault;
     }
 
     /// <summary>
@@ -65,9 +68,9 @@ public readonly struct RowRef( ExcelModule? module, uint rowId, Type? rowType )
     /// <typeparam name="T">The row type/schema to check against.</typeparam>
     /// <param name="row">The output row object.</param>
     /// <returns><see langword="true"/> if the type is valid, the row exists, and <paramref name="row"/> is written to, and <see langword="false"/> otherwise.</returns>
-    public bool TryGetValue< T >( out T row ) where T : struct, IExcelRow< T >
+    public bool TryGetValue< T >( [MaybeNullWhen(false)] out T row ) where T : IExcelRow< T >
     {
-        if( new RowRef< T >( module, rowId ).ValueNullable is { } v )
+        if( new RowRef< T >( module, rowId ).ValueOrDefault is { } v )
         {
             row = v;
             return true;
@@ -78,9 +81,9 @@ public readonly struct RowRef( ExcelModule? module, uint rowId, Type? rowType )
     }
 
     /// <inheritdoc cref="TryGetValue{T}(out T)"/>
-    public bool TryGetValueSubrow< T >( out SubrowExcelSheet< T >.SubrowCollection row ) where T : struct, IExcelRow< T >
+    public bool TryGetValueSubrow< T >( out SubrowExcelSheet< T >.SubrowCollection row ) where T : IExcelRow< T >
     {
-        if( new SubrowRef< T >( module, rowId ).ValueNullable is { } v )
+        if( new SubrowRef< T >( module, rowId ).ValueOrDefault is { } v )
         {
             row = v;
             return true;
@@ -130,10 +133,10 @@ public readonly struct RowRef( ExcelModule? module, uint rowId, Type? rowType )
     /// <param name="module">The <see cref="ExcelModule"/> to read sheet data from.</param>
     /// <param name="rowId">The referenced row id.</param>
     /// <returns>A <see cref="RowRef"/> to a row in a <see cref="RawExcelSheet"/>.</returns>
-    public static RowRef Create< T >( ExcelModule? module, uint rowId ) where T : struct, IExcelRow< T > => new( module, rowId, typeof( T ) );
+    public static RowRef Create< T >( ExcelModule? module, uint rowId ) where T : IExcelRow< T > => new( module, rowId, typeof( T ) );
 
     /// <inheritdoc cref="Create{T}(ExcelModule?, uint)"/>
-    public static RowRef CreateSubrow< T >( ExcelModule? module, uint rowId ) where T : struct, IExcelRow< T > => new( module, rowId, typeof( T ) );
+    public static RowRef CreateSubrow< T >( ExcelModule? module, uint rowId ) where T : IExcelRow< T > => new( module, rowId, typeof( T ) );
 
     /// <summary>
     /// Creates an untyped <see cref="RowRef"/>.

@@ -33,14 +33,14 @@ public class RawSubrowExcelSheet : RawExcelSheet, ISubrowExcelSheet
     /// <inheritdoc/>
     public bool HasSubrow( uint rowId, ushort subrowId )
     {
-        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId, out _ );
         return !Unsafe.IsNullRef( in lookup ) && subrowId < lookup.SubrowCount;
     }
 
     /// <inheritdoc/>
     public bool TryGetSubrowCount( uint rowId, out ushort subrowCount )
     {
-        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId, out _ );
         if( Unsafe.IsNullRef( in lookup ) )
         {
             subrowCount = 0;
@@ -54,7 +54,7 @@ public class RawSubrowExcelSheet : RawExcelSheet, ISubrowExcelSheet
     /// <inheritdoc/>
     public ushort GetSubrowCount( uint rowId )
     {
-        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId, out _ );
         return Unsafe.IsNullRef( in lookup ) ? throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null ) : lookup.SubrowCount;
     }
 }

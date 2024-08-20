@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Threading;
 using Lumina.Data;
 using Lumina.Data.Structs.Excel;
 using Lumina.Excel.Exceptions;
@@ -13,31 +16,42 @@ namespace Lumina.Excel.Sheets;
 /// <typeparam name="T">Type of the rows contained within.</typeparam>
 public readonly partial struct SubrowExcelSheet< T >
     : ISubrowExcelSheet, ICollection< SubrowExcelSheet< T >.SubrowCollection >, IReadOnlyCollection< SubrowExcelSheet< T >.SubrowCollection >
-    where T : struct, IExcelRow< T >
+    where T : IExcelRow< T >
 {
+    private readonly object?[]?[]? _rowCache;
+
     /// <summary>Creates a new instance of <see cref="SubrowExcelSheet{T}"/>, deducing column hash from <see cref="SheetAttribute"/> of <see cref="T"/> if available.
     /// </summary>
     /// <param name="rawSheet">Raw sheet to base this sheet on.</param>
+    /// <param name="rowCache">Row cache to use, if <typeparamref name="T"/> is a reference type.</param>
     /// <exception cref="MismatchedColumnHashException">Column hash deduced from sheet attribute was invalid (hash mismatch).</exception>
     /// <exception cref="NotSupportedException">Header file had a <see cref="ExcelVariant"/> value that is not supported.</exception>
     /// <returns>A new instance of <see cref="ExcelSheet{T}"/>.</returns>
-    public SubrowExcelSheet( RawSubrowExcelSheet rawSheet )
-        : this( rawSheet, rawSheet.Module.GetSheetAttributes< T >()?.ColumnHash )
+    public SubrowExcelSheet( RawSubrowExcelSheet rawSheet, object?[]?[]? rowCache = null )
+        : this( rawSheet, rawSheet.Module.GetSheetAttributes< T >()?.ColumnHash, rowCache )
     { }
 
     /// <summary>Creates a new instance of <see cref="SubrowExcelSheet{T}"/>.</summary>
     /// <param name="rawSheet">Raw sheet to base this sheet on.</param>
     /// <param name="columnHash">Hash of the columns in the sheet. If <see langword="null"/>, it will not check the hash.</param>
+    /// <param name="rowCache">Row cache to use, if <typeparamref name="T"/> is a reference type.</param>
     /// <exception cref="MismatchedColumnHashException"><paramref name="columnHash"/> was invalid (hash mismatch).</exception>
     /// <exception cref="NotSupportedException">Header file had a <see cref="ExcelVariant"/> value that is not supported.</exception>
     /// <returns>A new instance of <see cref="ExcelSheet{T}"/>.</returns>
-    public SubrowExcelSheet( RawSubrowExcelSheet rawSheet, uint? columnHash )
+    public SubrowExcelSheet( RawSubrowExcelSheet rawSheet, uint? columnHash, object?[]?[]? rowCache = null )
     {
+        if( typeof( T ).IsValueType )
+            rowCache = null;
+
         if( rawSheet.Variant != ExcelVariant.Subrows )
             throw new NotSupportedException( $"Sheet is not of {nameof( ExcelVariant.Subrows )} variant." );
         if( columnHash is not null && columnHash.Value != rawSheet.ColumnHash )
             throw new MismatchedColumnHashException( rawSheet.ColumnHash, columnHash.Value, nameof( columnHash ) );
+        if( rowCache is not null && rowCache.Length < rawSheet.Count )
+            throw new ArgumentException( "Size of cache must be at least the number of rows in the sheet.", nameof( rowCache ) );
+
         RawSheet = rawSheet;
+        _rowCache = rowCache;
     }
 
     /// <summary>Gets the raw sheet this typed sheet is based on.</summary>
@@ -101,8 +115,8 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <returns>A nullable subrow collection object. Returns <see langword="null"/> if the row does not exist.</returns>
     public SubrowCollection? GetRowOrDefault( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
-        return Unsafe.IsNullRef( in lookup ) ? null : new( this, in lookup );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        return Unsafe.IsNullRef( in lookup ) ? null : new( this, in lookup, rowIndex );
     }
 
     /// <summary>
@@ -113,14 +127,14 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <returns><see langword="true"/> if the row exists and <paramref name="row"/> is written to and <see langword="false"/> otherwise.</returns>
     public bool TryGetRow( uint rowId, out SubrowCollection row )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) )
         {
             row = default;
             return false;
         }
 
-        row = new( this, in lookup );
+        row = new( this, in lookup, rowIndex );
         return true;
     }
 
@@ -132,8 +146,8 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <exception cref="ArgumentOutOfRangeException">Thrown if the sheet does not have a row at that <paramref name="rowId"/>.</exception>
     public SubrowCollection GetRow( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
-        return Unsafe.IsNullRef( in lookup ) ? throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null ) : new( this, in lookup );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        return Unsafe.IsNullRef( in lookup ) ? throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null ) : new( this, in lookup, rowIndex );
     }
 
     /// <summary>
@@ -147,7 +161,7 @@ public readonly partial struct SubrowExcelSheet< T >
         ArgumentOutOfRangeException.ThrowIfNegative( rowIndex );
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( rowIndex, OffsetLookupTable.Length );
 
-        return new( this, in RawSheet.UnsafeGetRowLookupAt( rowIndex ) );
+        return new( this, in RawSheet.UnsafeGetRowLookupAt( rowIndex ), rowIndex );
     }
 
     /// <summary>
@@ -156,10 +170,12 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <param name="rowId">The row id to get.</param>
     /// <param name="subrowId">The subrow id to get.</param>
     /// <returns>A nullable row object. Returns null if the subrow does not exist.</returns>
+    /// <remarks>In case <typeparamref name="T"/> is a value type (<see langword="struct"/>), you can use <see cref="ExcelRowExtensions.AsNullable{T}"/> to
+    /// convert it to a <see cref="Nullable{T}"/>-wrapped type.</remarks>
     public T? GetSubrowOrDefault( uint rowId, ushort subrowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
-        return Unsafe.IsNullRef( in lookup ) || subrowId >= lookup.SubrowCount ? null : UnsafeCreateSubrow( in lookup, subrowId );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        return Unsafe.IsNullRef( in lookup ) || subrowId >= lookup.SubrowCount ? default : UnsafeCreateSubrow( rowIndex, subrowId, in lookup );
     }
 
     /// <summary>
@@ -169,16 +185,16 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <param name="subrowId">The subrow id to get.</param>
     /// <param name="subrow">The output row object.</param>
     /// <returns><see langword="true"/> if the subrow exists and <paramref name="subrow"/> is written to and <see langword="false"/> otherwise.</returns>
-    public bool TryGetSubrow( uint rowId, ushort subrowId, out T subrow )
+    public bool TryGetSubrow( uint rowId, ushort subrowId, [MaybeNullWhen( false )] out T subrow )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) || subrowId >= lookup.SubrowCount )
         {
             subrow = default;
             return false;
         }
 
-        subrow = UnsafeCreateSubrow( in lookup, subrowId );
+        subrow = UnsafeCreateSubrow( rowIndex, subrowId, in lookup );
         return true;
     }
 
@@ -191,13 +207,13 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <exception cref="ArgumentOutOfRangeException">Thrown if the sheet does not have a row at that <paramref name="rowId"/>.</exception>
     public T GetSubrow( uint rowId, ushort subrowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) )
             throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null );
 
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( subrowId, lookup.SubrowCount );
 
-        return UnsafeCreateSubrow( in lookup, subrowId );
+        return UnsafeCreateSubrow( rowIndex, subrowId, in lookup );
     }
 
     /// <summary>
@@ -216,7 +232,7 @@ public readonly partial struct SubrowExcelSheet< T >
         ref readonly var lookup = ref RawSheet.UnsafeGetRowLookupAt( rowIndex );
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( subrowId, lookup.SubrowCount );
 
-        return UnsafeCreateSubrow( in lookup, subrowId );
+        return UnsafeCreateSubrow( rowIndex, subrowId, in lookup );
     }
 
     /// <inheritdoc/>
@@ -229,8 +245,10 @@ public readonly partial struct SubrowExcelSheet< T >
         ArgumentOutOfRangeException.ThrowIfNegative( arrayIndex );
         if( Count > array.Length - arrayIndex )
             throw new ArgumentException( "The number of elements in the source list is greater than the available space." );
+
+        var rowIndex = 0;
         foreach( var lookup in OffsetLookupTable )
-            array[ arrayIndex++ ] = new( this, in lookup );
+            array[ arrayIndex++ ] = new( this, in lookup, rowIndex++ );
     }
 
     void ICollection< SubrowCollection >.Add( SubrowCollection item ) => throw new NotSupportedException();
@@ -258,12 +276,26 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <param name="subrowId">Index of the desired subrow.</param>
     /// <returns>A new instance of <typeparamref name="T"/>.</returns>
     private T UnsafeCreateSubrowAt( int rowIndex, ushort subrowId ) =>
-        UnsafeCreateSubrow( in RawSheet.UnsafeGetRowLookupAt( rowIndex ), subrowId );
+        UnsafeCreateSubrow( rowIndex, subrowId, in RawSheet.UnsafeGetRowLookupAt( rowIndex ) );
 
     /// <summary>Creates a subrow using the given lookup data, without checking for bounds or preconditions.</summary>
-    /// <param name="lookup">Lookup data for the desired row.</param>
+    /// <param name="rowIndex">Index of the desired row.</param>
     /// <param name="subrowId">Index of the desired subrow.</param>
+    /// <param name="row">Lookup data for the desired row.</param>
     /// <returns>A new instance of <typeparamref name="T"/>.</returns>
-    private T UnsafeCreateSubrow( scoped ref readonly RawExcelRow lookup, ushort subrowId ) =>
-        T.Create( lookup with { SubrowId = subrowId } );
+    private T UnsafeCreateSubrow( int rowIndex, ushort subrowId, scoped ref readonly RawExcelRow row )
+    {
+        if( _rowCache is null )
+            return T.Create( row with { SubrowId = subrowId } );
+
+        ref var slots = ref Unsafe.Add( ref MemoryMarshal.GetArrayDataReference( _rowCache ), rowIndex );
+        if( slots is null )
+            Interlocked.CompareExchange( ref slots, new object?[row.SubrowCount], null );
+
+        ref var slot = ref Unsafe.Add( ref MemoryMarshal.GetArrayDataReference( slots ), subrowId );
+        if( slot is null )
+            Interlocked.CompareExchange( ref slot, T.Create( row with { SubrowId = subrowId } ), null );
+
+        return (T) slot;
+    }
 }

@@ -26,6 +26,9 @@ public readonly record struct RawExcelRow(
     /// <summary>Gets the offset of the subrow itself.</summary>
     public uint SubrowOffset => Offset + 2 + SubrowId * ( SubrowDataOffset + 2u );
 
+    /// <summary>Gets a value indicating whether this row has no data nor no outgoing references.</summary>
+    public bool IsEmpty => Offset == 0;
+
     /// <inheritdoc/>
     public override string ToString() =>
         Page.RawSheet.Variant switch

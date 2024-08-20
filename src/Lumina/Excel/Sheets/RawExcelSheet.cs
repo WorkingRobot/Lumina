@@ -208,7 +208,7 @@ public class RawExcelSheet : IExcelSheet
     /// <inheritdoc/>
     public bool HasRow( uint rowId )
     {
-        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId );
+        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId, out _ );
         return !Unsafe.IsNullRef( in lookup ) && lookup.SubrowCount > 0;
     }
 
@@ -216,24 +216,26 @@ public class RawExcelSheet : IExcelSheet
     public override string ToString() => $"{Name}({Language}, {Variant}, {Count} row(s), {Columns.Count} column(s))";
 
     /// <summary>Gets a row lookup at the given index, if possible.</summary>
-    /// <param name="rowId">Index of the desired row.</param>
+    /// <param name="rowId">ID of the desired row.</param>
+    /// <param name="rowIndex">Index of the found row.</param>
     /// <returns>Lookup data for the desired row, or a null reference if no corresponding row exists.</returns>
     [MethodImpl( MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization )]
-    internal ref readonly RawExcelRow GetRowLookupOrNullRef( uint rowId )
+    internal ref readonly RawExcelRow GetRowLookupOrNullRef( uint rowId, out int rowIndex )
     {
         var lookupArrayIndex = unchecked( rowId - _rowIndexLookupArrayOffset );
         if( lookupArrayIndex < _rowIndexLookupArray.Length )
         {
-            var rowIndex = _rowIndexLookupArray.UnsafeAt( (int) lookupArrayIndex );
-            if( rowIndex == -1 )
-                return ref Unsafe.NullRef< RawExcelRow >();
-            return ref UnsafeGetRowLookupAt( rowIndex );
+            rowIndex = _rowIndexLookupArray.UnsafeAt( (int) lookupArrayIndex );
+        }
+        else
+        {
+            ref readonly var rowIndexRef = ref _rowIndexLookupDict.GetValueRefOrNullRef( (int) rowId );
+            rowIndex = !Unsafe.IsNullRef( in rowIndexRef ) ? rowIndexRef : -1;
         }
 
-        ref readonly var rowIndexRef = ref _rowIndexLookupDict.GetValueRefOrNullRef( (int) rowId );
-        if( Unsafe.IsNullRef( in rowIndexRef ) )
+        if( rowIndex == -1 )
             return ref Unsafe.NullRef< RawExcelRow >();
-        return ref UnsafeGetRowLookupAt( rowIndexRef );
+        return ref UnsafeGetRowLookupAt( rowIndex );
     }
 
     /// <summary>Gets a page at the given index, without checking for bounds or preconditions.</summary>

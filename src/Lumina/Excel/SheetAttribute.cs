@@ -5,7 +5,7 @@ namespace Lumina.Excel;
 /// <summary>
 /// An attribute attached to a schema/struct that represents a sheet in an Excel file.
 /// </summary>
-[AttributeUsage( AttributeTargets.Struct )]
+[AttributeUsage( AttributeTargets.Struct | AttributeTargets.Class )]
 public sealed class SheetAttribute : Attribute
 {
     /// <summary>

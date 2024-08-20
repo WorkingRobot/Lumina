@@ -11,7 +11,7 @@ namespace Lumina.Excel;
 /// <remarks>Mostly an implementation detail for reading Excel rows. This type does not store or hold any row data, and is therefore lightweight and trivially constructable.</remarks>
 /// <typeparam name="T">A type that wraps a group of fields inside a row.</typeparam>
 public readonly partial struct Collection< T >( ExcelPage page, uint parentOffset, uint offset, Func< ExcelPage, uint, uint, uint, T > ctor, int size )
-    : IList< T >, IReadOnlyList< T > where T : struct
+    : IList< T >, IReadOnlyList< T >
 {
     /// <inheritdoc cref="ICollection{T}.Count"/>
     public int Count => size;

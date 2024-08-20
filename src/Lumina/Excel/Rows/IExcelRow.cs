@@ -4,7 +4,7 @@ namespace Lumina.Excel.Rows;
 /// Defines a row type/schema for an Excel sheet.
 /// </summary>
 /// <typeparam name="T">The type that implements the interface.</typeparam>
-public interface IExcelRow< out T > where T : struct
+public interface IExcelRow< out T >
 {
     /// <summary>Gets the raw row backing this row.</summary>
     RawExcelRow RawRow { get; }
