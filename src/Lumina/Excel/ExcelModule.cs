@@ -115,7 +115,7 @@ public class ExcelModule
             GameData.Options.PanicOnSheetChecksumMismatch ? attribute?.ColumnHash : null,
             typeof( T ).IsValueType
                 ? null
-                : (object?[]) rowCache?.GetOrAdd( typeof( T ), static ( _, context ) => new object?[context], rawSheet.Count ) );
+                : (object?[]?) rowCache?.GetOrAdd( typeof( T ), static ( _, context ) => new object?[context], rawSheet.Count ) );
     }
 
     /// <summary>Loads a <see cref="SubrowExcelSheet{T}"/>.</summary>
