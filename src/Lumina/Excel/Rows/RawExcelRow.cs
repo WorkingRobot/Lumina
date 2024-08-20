@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Lumina.Data;
+using Lumina.Data.Structs.Excel;
 
 namespace Lumina.Excel.Rows;
 
@@ -24,4 +25,14 @@ public readonly record struct RawExcelRow(
 {
     /// <summary>Gets the offset of the subrow itself.</summary>
     public uint SubrowOffset => Offset + 2 + SubrowId * ( SubrowDataOffset + 2u );
+
+    /// <inheritdoc/>
+    public override string ToString() =>
+        Page.RawSheet.Variant switch
+        {
+            ExcelVariant.Default => $"{Page.RawSheet.Name}#{RowId} at {Offset} in {Language}",
+            ExcelVariant.Subrows => $"{Page.RawSheet.Name}#{RowId}[{SubrowId}/{SubrowCount}] at {SubrowDataOffset} in {Language}",
+            ExcelVariant.Unknown => $"{Page.RawSheet.Name}#{RowId} at {Offset} in {Language} of variant {Page.RawSheet.Variant}",
+            _ => $"{Page.RawSheet.Name}#{RowId} at {Offset} in {Language} of variant {Page.RawSheet.Variant}"
+        };
 }

@@ -34,6 +34,9 @@ public readonly struct SubrowRef< T >( ExcelModule? module, uint rowId ) where T
     /// </summary>
     public SubrowExcelSheet< T >.SubrowCollection? ValueNullable => _sheet?.GetRowOrDefault( rowId );
 
+    /// <inheritdoc/>
+    public override string ToString() => $"{nameof(SubrowRef<T>)}({typeof( T ).Name}#{rowId})";
+
     private RowRef ToGeneric() => RowRef.CreateSubrow< T >( module, rowId );
 
     /// <summary>

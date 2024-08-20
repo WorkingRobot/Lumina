@@ -50,6 +50,9 @@ public readonly partial struct SubrowExcelSheet< T >
     public Language Language => RawSheet.Language;
 
     /// <inheritdoc/>
+    public string Name => RawSheet.Name;
+
+    /// <inheritdoc/>
     public ExcelVariant Variant => RawSheet.Variant;
 
     /// <inheritdoc/>
@@ -246,6 +249,9 @@ public readonly partial struct SubrowExcelSheet< T >
     IEnumerator< SubrowCollection > IEnumerable< SubrowCollection >.GetEnumerator() => GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    /// <inheritdoc/>
+    public override string ToString() => $"{Name}<{typeof( T ).Name}>({Language}, {Variant}, {Count} row(s), {Columns.Count} column(s))";
 
     /// <summary>Creates a subrow at the given index, without checking for bounds or preconditions.</summary>
     /// <param name="rowIndex">Index of the desired row.</param>

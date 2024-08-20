@@ -58,7 +58,6 @@ public class RawExcelSheet : IExcelSheet
 
     private readonly ExcelPage[] _pages;
     private readonly RawExcelRow[] _rawExcelRows;
-    private readonly ushort _subrowDataOffset;
 
     // RowLookup must use int as the key because it benefits from a fast path that removes indirections.
     // https://github.com/dotnet/runtime/blob/release/8.0/src/libraries/System.Collections.Immutable/src/System/Collections/Frozen/FrozenDictionary.cs#L140
@@ -72,6 +71,9 @@ public class RawExcelSheet : IExcelSheet
 
     /// <inheritdoc/>
     public Language Language { get; }
+
+    /// <inheritdoc/>
+    public string Name { get; }
 
     /// <inheritdoc/>
     public ExcelVariant Variant { get; }
@@ -92,7 +94,7 @@ public class RawExcelSheet : IExcelSheet
         ArgumentNullException.ThrowIfNull( module );
         ArgumentNullException.ThrowIfNull( headerFile );
 
-        var name = headerFile.FilePath.Path[ 4..^4 ]; // "exd/" ... ".exh"
+        Name = headerFile.FilePath.Path[ 4..^4 ]; // "exd/" ... ".exh"
         if( !headerFile.Languages.Contains( language ) )
             throw new UnsupportedLanguageException( nameof( language ), language, null );
 
@@ -103,7 +105,6 @@ public class RawExcelSheet : IExcelSheet
         Variant = headerFile.Header.Variant;
         Columns = headerFile.ColumnDefinitions;
         ColumnHash = headerFile.GetColumnsHash();
-        _subrowDataOffset = hasSubrows ? headerFile.Header.DataOffset : (ushort) 0;
         _pages = new ExcelPage[headerFile.DataPages.Length];
         _rawExcelRows = new RawExcelRow[headerFile.Header.RowCount];
 
@@ -112,13 +113,13 @@ public class RawExcelSheet : IExcelSheet
         {
             var pageDef = headerFile.DataPages[ pageIdx ];
             var filePath = Language == Language.None
-                ? $"exd/{name}_{pageDef.StartId}.exd"
-                : $"exd/{name}_{pageDef.StartId}_{LanguageUtil.GetLanguageStr( Language )}.exd";
+                ? $"exd/{Name}_{pageDef.StartId}.exd"
+                : $"exd/{Name}_{pageDef.StartId}_{LanguageUtil.GetLanguageStr( Language )}.exd";
             var fileData = module.GameData.GetFile< ExcelDataFile >( filePath );
             if( fileData == null )
                 continue;
 
-            var newPage = _pages[ pageIdx ] = new( Module, fileData.Data, headerFile.Header.DataOffset );
+            var newPage = _pages[ pageIdx ] = new( this, pageIdx, fileData.Data, headerFile.Header.DataOffset );
 
             // If row count information from exh file is incorrect, cope with it.
             if( i + fileData.RowData.Count > _rawExcelRows.Length )
@@ -210,6 +211,9 @@ public class RawExcelSheet : IExcelSheet
         ref readonly var lookup = ref GetRowLookupOrNullRef( rowId );
         return !Unsafe.IsNullRef( in lookup ) && lookup.SubrowCount > 0;
     }
+
+    /// <inheritdoc/>
+    public override string ToString() => $"{Name}({Language}, {Variant}, {Count} row(s), {Columns.Count} column(s))";
 
     /// <summary>Gets a row lookup at the given index, if possible.</summary>
     /// <param name="rowId">Index of the desired row.</param>

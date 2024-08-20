@@ -5,6 +5,7 @@ using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Lumina.Excel.Sheets;
 
 namespace Lumina.Excel;
 
@@ -17,28 +18,31 @@ namespace Lumina.Excel;
 [EditorBrowsable( EditorBrowsableState.Advanced )]
 public sealed class ExcelPage
 {
-    /// <summary>
-    /// The module that this page belongs to.
-    /// </summary>
-    public ExcelModule Module { get; }
+    private readonly byte[] _data;
+    private readonly int _pageIndex;
+    private readonly ushort _dataOffset;
 
-    private readonly byte[] data;
-    private ReadOnlyMemory< byte > Data => data;
-
-    private readonly ushort dataOffset;
-
-    internal ExcelPage( ExcelModule module, byte[] pageData, ushort headerDataOffset )
+    internal ExcelPage( RawExcelSheet rawSheet, int pageIndex, byte[] pageData, ushort headerDataOffset )
     {
-        Module = module;
-        data = pageData;
-        dataOffset = headerDataOffset;
+        RawSheet = rawSheet;
+        _pageIndex = pageIndex;
+        _data = pageData;
+        _dataOffset = headerDataOffset;
     }
+
+    /// <summary>Gets the module that this page belongs to.</summary>
+    public ExcelModule Module => RawSheet.Module;
+
+    /// <summary>Gets the raw sheet that this page belongs to.</summary>
+    public RawExcelSheet RawSheet { get; }
+
+    private ReadOnlyMemory< byte > Data => _data;
 
     // Ignores bounds checks to speed up reading data.
     // https://t.ly/EmR4n (Sharplab link)
     [MethodImpl( MethodImplOptions.AggressiveInlining )]
     private D Read< D >( nuint offset ) where D : unmanaged =>
-        Unsafe.As< byte, D >( ref Unsafe.AddByteOffset( ref MemoryMarshal.GetArrayDataReference( data ), offset ) );
+        Unsafe.As< byte, D >( ref Unsafe.AddByteOffset( ref MemoryMarshal.GetArrayDataReference( _data ), offset ) );
 
     [MethodImpl( MethodImplOptions.AggressiveInlining )]
     private static float ReverseEndianness( float v ) =>
@@ -56,7 +60,7 @@ public sealed class ExcelPage
     [MethodImpl( MethodImplOptions.AggressiveInlining )]
     public ReadOnlySeString ReadString( nuint offset, nuint structOffset )
     {
-        offset = ReadUInt32( offset ) + structOffset + dataOffset;
+        offset = ReadUInt32( offset ) + structOffset + _dataOffset;
         var data = Data[ (int) offset.. ];
         var stringLength = data.Span.IndexOf( (byte) 0 );
         var ret = new ReadOnlySeString( data[ ..stringLength ] );
@@ -168,4 +172,7 @@ public sealed class ExcelPage
     [MethodImpl( MethodImplOptions.AggressiveInlining )]
     public bool ReadPackedBool( nuint offset, byte bit ) =>
         ( Read< byte >( offset ) & ( 1 << bit ) ) != 0;
+
+    /// <inheritdoc/>
+    public override string ToString() => $"{nameof( ExcelPage )}({RawSheet} page {_pageIndex})";
 }

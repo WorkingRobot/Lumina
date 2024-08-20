@@ -42,6 +42,9 @@ public readonly partial struct SubrowExcelSheet< T >
         /// <inheritdoc/>
         public readonly void Dispose()
         { }
+
+        /// <inheritdoc/>
+        public override string ToString() => $"{nameof(Enumerator)}({_index}/{sheet.Count} for {sheet})";
     }
 
     /// <summary>Represents an enumerator that iterates over all subrows in a <see cref="SubrowExcelSheet{T}"/>.</summary>
@@ -105,5 +108,8 @@ public readonly partial struct SubrowExcelSheet< T >
         readonly IEnumerator< T > IEnumerable< T >.GetEnumerator() => GetEnumerator();
 
         readonly IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        /// <inheritdoc/>
+        public override string ToString() => $"{nameof(FlatEnumerator)}({_subrowIndex}/{_subrowCount}, {_index}/{sheet.Count} for {sheet})";
     }
 }

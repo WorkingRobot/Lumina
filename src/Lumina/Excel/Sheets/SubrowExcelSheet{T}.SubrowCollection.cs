@@ -90,6 +90,9 @@ public readonly partial struct SubrowExcelSheet< T >
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+        /// <inheritdoc/>
+        public override string ToString() => $"{nameof(SubrowCollection)}({Sheet.Name}#{RowId}, {Count} items)";
+
         /// <summary>Enumerator that enumerates over subrows under one row.</summary>
         /// <param name="subrowCollection">Subrow collection to iterate over.</param>
         public struct SubrowEnumerator( SubrowCollection subrowCollection ) : IEnumerator< T >
@@ -123,6 +126,9 @@ public readonly partial struct SubrowExcelSheet< T >
             /// <inheritdoc/>
             public readonly void Dispose()
             { }
+
+            /// <inheritdoc/>
+            public override string ToString() => $"{nameof(Enumerator)}({_index}/{subrowCollection.Count} for {subrowCollection})";
         }
     }
 }

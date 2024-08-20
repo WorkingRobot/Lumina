@@ -19,5 +19,8 @@ namespace Lumina.Data.Structs.Excel
                 Offset = reader.ReadUInt16(),
             };
         }
+
+        /// <inheritdoc/>
+        public override string ToString() => $"{nameof(ExcelColumnDefinition)}@{Offset}: {Type}";
     }
 }

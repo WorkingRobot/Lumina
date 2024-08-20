@@ -40,5 +40,8 @@ public readonly partial struct ExcelSheet< T >
         /// <inheritdoc/>
         public readonly void Dispose()
         { }
+
+        /// <inheritdoc/>
+        public override string ToString() => $"{nameof(Enumerator)}({_index}/{sheet.Count} for {sheet})";
     }
 }

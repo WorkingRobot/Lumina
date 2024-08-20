@@ -17,6 +17,9 @@ internal interface IExcelSheet
     /// <remarks>This can be different from the requested language if it wasn't supported.</remarks>
     Language Language { get; }
 
+    /// <summary>Gets the name of the sheet.</summary>
+    string Name { get; }
+
     /// <summary>Gets the variant of this sheet.</summary>
     ExcelVariant Variant { get; }
 
