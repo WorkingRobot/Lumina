@@ -77,7 +77,7 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     public int Count => RawSheet.Count;
 
     /// <inheritdoc/>
-    public ReadOnlySpan< RawExcelRow > OffsetLookupTable => RawSheet.OffsetLookupTable;
+    public ReadOnlySpan< RawExcelRow > RawRows => RawSheet.RawRows;
 
     bool ICollection< T >.IsReadOnly => true;
 
@@ -99,7 +99,7 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     /// convert it to a <see cref="Nullable{T}"/>-wrapped type.</remarks>
     public T? GetRowOrDefault( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         return Unsafe.IsNullRef( in lookup ) ? default : UnsafeCreateRow( rowIndex, in lookup );
     }
 
@@ -111,7 +111,7 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     /// <returns><see langword="true"/> if the row exists and <paramref name="row"/> is written to and <see langword="false"/> otherwise.</returns>
     public bool TryGetRow( uint rowId, [MaybeNullWhen( false )] out T row )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) )
         {
             row = default;
@@ -130,7 +130,7 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     /// <exception cref="ArgumentOutOfRangeException">Throws when the row id does not have a row attached to it.</exception>
     public T GetRow( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         return Unsafe.IsNullRef( in lookup ) ? throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null ) : UnsafeCreateRow( rowIndex, in lookup );
     }
 
@@ -143,7 +143,7 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
     public T GetRowAt( int rowIndex )
     {
         ArgumentOutOfRangeException.ThrowIfNegative( rowIndex );
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( rowIndex, OffsetLookupTable.Length );
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( rowIndex, RawRows.Length );
 
         return UnsafeCreateRowAt( rowIndex );
     }
@@ -160,7 +160,7 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
             throw new ArgumentException( "The number of elements in the source list is greater than the available space." );
 
         var rowIndex = 0;
-        foreach( var lookup in OffsetLookupTable )
+        foreach( var lookup in RawRows )
             array[ arrayIndex++ ] = UnsafeCreateRow( rowIndex++, in lookup );
     }
 

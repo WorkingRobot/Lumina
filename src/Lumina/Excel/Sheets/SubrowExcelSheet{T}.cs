@@ -79,7 +79,7 @@ public readonly partial struct SubrowExcelSheet< T >
     public int Count => RawSheet.Count;
 
     /// <inheritdoc/>
-    public ReadOnlySpan< RawExcelRow > OffsetLookupTable => RawSheet.OffsetLookupTable;
+    public ReadOnlySpan< RawExcelRow > RawRows => RawSheet.RawRows;
 
     /// <inheritdoc/>
     public int TotalSubrowCount => RawSheet.TotalSubrowCount;
@@ -115,7 +115,7 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <returns>A nullable subrow collection object. Returns <see langword="null"/> if the row does not exist.</returns>
     public SubrowCollection? GetRowOrDefault( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         return Unsafe.IsNullRef( in lookup ) ? null : new( this, in lookup, rowIndex );
     }
 
@@ -127,7 +127,7 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <returns><see langword="true"/> if the row exists and <paramref name="row"/> is written to and <see langword="false"/> otherwise.</returns>
     public bool TryGetRow( uint rowId, out SubrowCollection row )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) )
         {
             row = default;
@@ -146,7 +146,7 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <exception cref="ArgumentOutOfRangeException">Thrown if the sheet does not have a row at that <paramref name="rowId"/>.</exception>
     public SubrowCollection GetRow( uint rowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         return Unsafe.IsNullRef( in lookup ) ? throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null ) : new( this, in lookup, rowIndex );
     }
 
@@ -159,7 +159,7 @@ public readonly partial struct SubrowExcelSheet< T >
     public SubrowCollection GetRowAt( int rowIndex )
     {
         ArgumentOutOfRangeException.ThrowIfNegative( rowIndex );
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( rowIndex, OffsetLookupTable.Length );
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( rowIndex, RawRows.Length );
 
         return new( this, in RawSheet.UnsafeGetRowLookupAt( rowIndex ), rowIndex );
     }
@@ -174,7 +174,7 @@ public readonly partial struct SubrowExcelSheet< T >
     /// convert it to a <see cref="Nullable{T}"/>-wrapped type.</remarks>
     public T? GetSubrowOrDefault( uint rowId, ushort subrowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         return Unsafe.IsNullRef( in lookup ) || subrowId >= lookup.SubrowCount ? default : UnsafeCreateSubrow( rowIndex, subrowId, in lookup );
     }
 
@@ -187,7 +187,7 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <returns><see langword="true"/> if the subrow exists and <paramref name="subrow"/> is written to and <see langword="false"/> otherwise.</returns>
     public bool TryGetSubrow( uint rowId, ushort subrowId, [MaybeNullWhen( false )] out T subrow )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) || subrowId >= lookup.SubrowCount )
         {
             subrow = default;
@@ -207,7 +207,7 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <exception cref="ArgumentOutOfRangeException">Thrown if the sheet does not have a row at that <paramref name="rowId"/>.</exception>
     public T GetSubrow( uint rowId, ushort subrowId )
     {
-        ref readonly var lookup = ref RawSheet.GetRowLookupOrNullRef( rowId, out var rowIndex );
+        ref readonly var lookup = ref RawSheet.GetRawRowOrNullRef( rowId, out var rowIndex );
         if( Unsafe.IsNullRef( in lookup ) )
             throw new ArgumentOutOfRangeException( nameof( rowId ), rowId, null );
 
@@ -225,7 +225,7 @@ public readonly partial struct SubrowExcelSheet< T >
     /// <returns>A row object.</returns>
     public T GetSubrowAt( int rowIndex, ushort subrowId )
     {
-        var offsetLookupTable = OffsetLookupTable;
+        var offsetLookupTable = RawRows;
         ArgumentOutOfRangeException.ThrowIfNegative( rowIndex );
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual( rowIndex, offsetLookupTable.Length );
 
@@ -247,7 +247,7 @@ public readonly partial struct SubrowExcelSheet< T >
             throw new ArgumentException( "The number of elements in the source list is greater than the available space." );
 
         var rowIndex = 0;
-        foreach( var lookup in OffsetLookupTable )
+        foreach( var lookup in RawRows )
             array[ arrayIndex++ ] = new( this, in lookup, rowIndex++ );
     }
 

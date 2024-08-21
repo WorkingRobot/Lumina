@@ -37,7 +37,7 @@ internal interface IExcelSheet
     int Count { get; }
 
     /// <summary>Gets the raw rows.</summary>
-    ReadOnlySpan< RawExcelRow > OffsetLookupTable { get; }
+    ReadOnlySpan< RawExcelRow > RawRows { get; }
 
     /// <summary>Gets the offset of the column at <paramref name="columnIdx"/> in the row data.</summary>
     /// <param name="columnIdx">The index of the column.</param>

@@ -56,7 +56,6 @@ public class RawExcelSheet : IExcelSheet
     // We're allowing up to 65536 lookup items in _RawExcelRowTable, at cost of up to 3293KB of lookup items that resolve to nonexistence per language.
     private const int MaxUnusedLookupItemCount = 65536;
 
-    private readonly ExcelPage[] _pages;
     private readonly RawExcelRow[] _rawExcelRows;
 
     // RowLookup must use int as the key because it benefits from a fast path that removes indirections.
@@ -105,7 +104,6 @@ public class RawExcelSheet : IExcelSheet
         Variant = headerFile.Header.Variant;
         Columns = headerFile.ColumnDefinitions;
         ColumnHash = headerFile.GetColumnsHash();
-        _pages = new ExcelPage[headerFile.DataPages.Length];
         _rawExcelRows = new RawExcelRow[headerFile.Header.RowCount];
 
         var i = 0;
@@ -119,7 +117,7 @@ public class RawExcelSheet : IExcelSheet
             if( fileData == null )
                 continue;
 
-            var newPage = _pages[ pageIdx ] = new( this, pageIdx, fileData.Data, headerFile.Header.DataOffset );
+            var newPage = new ExcelPage( this, pageIdx, fileData.Data, headerFile.Header.DataOffset );
 
             // If row count information from exh file is incorrect, cope with it.
             if( i + fileData.RowData.Count > _rawExcelRows.Length )
@@ -130,7 +128,7 @@ public class RawExcelSheet : IExcelSheet
                 var subrowCount = hasSubrows ? newPage.ReadUInt16( rowPtr.Offset + 4 ) : (ushort) 1;
                 var rowOffset = rowPtr.Offset + 6;
                 _rawExcelRows[ i++ ] = new(
-                    _pages[ pageIdx ],
+                    newPage,
                     rowPtr.RowId,
                     rowOffset,
                     language,
@@ -200,7 +198,7 @@ public class RawExcelSheet : IExcelSheet
     public int Count { get; }
 
     /// <inheritdoc/>
-    public ReadOnlySpan< RawExcelRow > OffsetLookupTable => _rawExcelRows;
+    public ReadOnlySpan< RawExcelRow > RawRows => _rawExcelRows;
 
     /// <inheritdoc/>
     public ushort GetColumnOffset( int columnIdx ) => Columns[ columnIdx ].Offset;
@@ -208,7 +206,7 @@ public class RawExcelSheet : IExcelSheet
     /// <inheritdoc/>
     public bool HasRow( uint rowId )
     {
-        ref readonly var lookup = ref GetRowLookupOrNullRef( rowId, out _ );
+        ref readonly var lookup = ref GetRawRowOrNullRef( rowId, out _ );
         return !Unsafe.IsNullRef( in lookup ) && lookup.SubrowCount > 0;
     }
 
@@ -220,7 +218,7 @@ public class RawExcelSheet : IExcelSheet
     /// <param name="rowIndex">Index of the found row.</param>
     /// <returns>Lookup data for the desired row, or a null reference if no corresponding row exists.</returns>
     [MethodImpl( MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization )]
-    internal ref readonly RawExcelRow GetRowLookupOrNullRef( uint rowId, out int rowIndex )
+    public ref readonly RawExcelRow GetRawRowOrNullRef( uint rowId, out int rowIndex )
     {
         var lookupArrayIndex = unchecked( rowId - _rowIndexLookupArrayOffset );
         if( lookupArrayIndex < _rowIndexLookupArray.Length )
@@ -230,18 +228,13 @@ public class RawExcelSheet : IExcelSheet
         else
         {
             ref readonly var rowIndexRef = ref _rowIndexLookupDict.GetValueRefOrNullRef( (int) rowId );
-            rowIndex = !Unsafe.IsNullRef( in rowIndexRef ) ? rowIndexRef : -1;
+            rowIndex = Unsafe.IsNullRef( in rowIndexRef ) ? -1 : rowIndexRef;
         }
 
         if( rowIndex == -1 )
             return ref Unsafe.NullRef< RawExcelRow >();
         return ref UnsafeGetRowLookupAt( rowIndex );
     }
-
-    /// <summary>Gets a page at the given index, without checking for bounds or preconditions.</summary>
-    /// <param name="pageIndex">Index of the desired page.</param>
-    /// <returns>Page at the given index.</returns>
-    internal ExcelPage UnsafeGetPageAt( int pageIndex ) => _pages.UnsafeAt( pageIndex );
 
     /// <summary>Gets a row lookup at the given index, without checking for bounds or preconditions.</summary>
     /// <param name="rowIndex">Index of the desired row.</param>
