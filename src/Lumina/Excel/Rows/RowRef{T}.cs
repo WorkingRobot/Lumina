@@ -6,15 +6,12 @@ namespace Lumina.Excel.Rows;
 /// <summary>
 /// A helper type to concretely reference a row in a specific Excel sheet.
 /// </summary>
-/// <typeparam name="T">The row type referenced by the <see cref="RowId"/>.</typeparam>
-/// <param name="module">The <see cref="ExcelModule"/> to read sheet data from.</param>
-/// <param name="rowId">The referenced row id.</param>
-public readonly struct RowRef< T >( ExcelModule? module, uint rowId ) where T : IExcelRow< T >
+/// <typeparam name="T">Type of the row referenced by the <see cref="RowId"/>.</typeparam>
+/// <param name="Module"><see cref="ExcelModule"/> to read sheet data from.</param>
+/// <param name="RowId">ID of the referenced row.</param>
+public readonly record struct RowRef< T >( ExcelModule? Module, uint RowId ) where T : IExcelRow< T >
 {
-    private readonly ExcelSheet< T >? _sheet = module?.GetSheet< T >();
-
-    /// <summary>Gets the ID of the referenced row.</summary>
-    public uint RowId => rowId;
+    private readonly ExcelSheet< T >? _sheet = Module?.GetSheet< T >();
 
     /// <summary>Gets a value indicating whether the <see cref="RowId"/> exists in the sheet.</summary>
     public bool IsValid => _sheet?.HasRow( RowId ) ?? false;
@@ -27,12 +24,12 @@ public readonly struct RowRef< T >( ExcelModule? module, uint rowId ) where T : 
     /// <value>Instance of <typeparamref name="T"/> if corresponding row could be found; <see langword="default"/> otherwise.</value>
     /// <remarks>In case <typeparamref name="T"/> is a value type (<see langword="struct"/>), you can use <see cref="ExcelRowExtensions.AsNullable{T}"/> to
     /// convert it to a <see cref="Nullable{T}"/>-wrapped type.</remarks>
-    public T? ValueOrDefault => _sheet is null ? default : _sheet.Value.GetRowOrDefault( rowId );
+    public T? ValueOrDefault => _sheet is null ? default : _sheet.Value.GetRowOrDefault( RowId );
 
     /// <inheritdoc/>
-    public override string ToString() => $"{nameof(RowRef<T>)}({typeof( T ).Name}#{rowId})";
+    public override string ToString() => $"{nameof( RowRef< T > )}({typeof( T ).Name}#{RowId})";
 
-    private RowRef ToGeneric() => RowRef.Create< T >( module, rowId );
+    private RowRef ToGeneric() => RowRef.Create< T >( Module, RowId );
 
     /// <summary>
     /// Converts a concrete <see cref="RowRef{T}"/> to a generic and dynamically typed <see cref="RowRef"/>.

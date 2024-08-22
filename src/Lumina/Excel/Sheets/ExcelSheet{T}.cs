@@ -14,7 +14,12 @@ namespace Lumina.Excel.Sheets;
 
 /// <summary>A typed Excel sheet of <see cref="ExcelVariant.Default"/> variant that wraps around a <see cref="RawExcelSheet"/>.</summary>
 /// <typeparam name="T">Type of the rows contained within.</typeparam>
-public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, IReadOnlyCollection< T > where T : IExcelRow< T >
+public readonly partial struct ExcelSheet< T >
+    : IExcelSheet
+        , ICollection< T >
+        , IReadOnlyCollection< T >
+        , IEquatable< ExcelSheet< T > >
+    where T : IExcelRow< T >
 {
     private readonly object?[]? _rowCache;
 
@@ -179,6 +184,29 @@ public readonly partial struct ExcelSheet< T > : IExcelSheet, ICollection< T >, 
 
     /// <inheritdoc/>
     public override string ToString() => $"{Name}<{typeof( T ).Name}>({Language}, {Variant}, {Count} row(s), {Columns.Count} column(s))";
+
+    /// <inheritdoc/>
+    public bool Equals(ExcelSheet< T > other) => RawSheet.Equals(other.RawSheet);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) => obj is ExcelSheet< T > other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine( RawSheet, typeof( T ) );
+
+    /// <summary>Compares two values to determine equality.</summary>
+    /// <param name="left">The value to compare with <paramref name="right" />.</param>
+    /// <param name="right">The value to compare with <paramref name="left" />.</param>
+    /// <returns>
+    /// <see langword="true" /> if <paramref name="left" /> is equal to <paramref name="right" />; otherwise, <see langword="false" />.</returns>
+    public static bool operator ==(ExcelSheet< T > left, ExcelSheet< T > right) => left.Equals(right);
+
+    /// <summary>Compares two values to determine inequality.</summary>
+    /// <param name="left">The value to compare with <paramref name="right" />.</param>
+    /// <param name="right">The value to compare with <paramref name="left" />.</param>
+    /// <returns>
+    /// <see langword="true" /> if <paramref name="left" /> is not equal to <paramref name="right" />; otherwise, <see langword="false" />.</returns>
+    public static bool operator !=(ExcelSheet< T > left, ExcelSheet< T > right) => !left.Equals(right);
 
     /// <summary>Creates a row at the given index, without checking for bounds or preconditions.</summary>
     /// <param name="rowIndex">Index of the desired row.</param>

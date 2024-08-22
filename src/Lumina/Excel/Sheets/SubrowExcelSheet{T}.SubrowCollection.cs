@@ -114,7 +114,10 @@ public readonly partial struct SubrowExcelSheet< T >
                     // UnsafeCreateSubrow must be called only when the preconditions are validated.
                     // If it is to be called on-demand from get_Current, then it may end up being called with invalid parameters,
                     // so we create the instance in advance here.
-                    Current = subrowCollection.Sheet.UnsafeCreateSubrow( subrowCollection._rowIndex, unchecked( (ushort) _index ), in subrowCollection._rawRow );
+                    Current = subrowCollection.Sheet.UnsafeCreateSubrow(
+                        subrowCollection._rowIndex,
+                        unchecked( (ushort) _index ),
+                        in subrowCollection._rawRow );
                     return true;
                 }
 

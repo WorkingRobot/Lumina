@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Lumina.Data.Structs.Excel;
 
 namespace Lumina.Excel.Sheets;
 
@@ -42,6 +43,6 @@ public readonly partial struct ExcelSheet< T >
         { }
 
         /// <inheritdoc/>
-        public override string ToString() => $"{nameof(Enumerator)}({_index}/{sheet.Count} for {sheet})";
+        public override string ToString() => $"{nameof( Enumerator )}({_index}/{sheet.Count} for {sheet})";
     }
 }
