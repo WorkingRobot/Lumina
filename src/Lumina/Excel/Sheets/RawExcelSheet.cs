@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Frozen;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -121,20 +120,20 @@ public class RawExcelSheet : IExcelSheet
             var newPage = new ExcelPage( this, pageIdx, fileData.Data, headerFile.Header.DataOffset );
 
             // If row count information from exh file is incorrect, cope with it.
-            if( i + fileData.RowData.Count > _rawExcelRows.Length )
-                Array.Resize( ref _rawExcelRows, i + fileData.RowData.Count );
+            if( i + fileData.RowOffsets.Length > _rawExcelRows.Length )
+                Array.Resize( ref _rawExcelRows, i + fileData.RowOffsets.Length );
 
-            foreach( var rowPtr in fileData.RowData.Values )
+            foreach( var rowOffset in fileData.RowOffsets )
             {
-                var subrowCount = hasSubrows ? newPage.ReadUInt16( rowPtr.Offset + 4 ) : (ushort) 1;
-                var rowOffset = rowPtr.Offset + 6;
+                var rowHeader = fileData.GetRowHeaderAt( rowOffset.Offset );
+                var rowDataOffset = rowOffset.Offset + (uint)Unsafe.SizeOf<ExcelDataRowHeader>();
                 _rawExcelRows[ i++ ] = new(
                     newPage,
-                    rowPtr.RowId,
-                    rowOffset,
+                    rowOffset.RowId,
+                    rowDataOffset,
                     language,
                     hasSubrows ? headerFile.Header.DataOffset : (ushort) 0,
-                    subrowCount,
+                    hasSubrows ? rowHeader.RowCount : (ushort) 1,
                     0 );
             }
         }
