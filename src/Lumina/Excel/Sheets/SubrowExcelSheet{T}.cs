@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -73,7 +74,7 @@ public readonly partial struct SubrowExcelSheet< T >
     public ExcelVariant Variant => RawSheet.Variant;
 
     /// <inheritdoc/>
-    public IReadOnlyList< ExcelColumnDefinition > Columns => RawSheet.Columns;
+    public ImmutableArray< ExcelColumnDefinition > Columns => RawSheet.Columns;
 
     /// <inheritdoc/>
     public uint ColumnHash => RawSheet.ColumnHash;
@@ -86,9 +87,6 @@ public readonly partial struct SubrowExcelSheet< T >
 
     /// <inheritdoc/>
     public int TotalSubrowCount => RawSheet.TotalSubrowCount;
-
-    /// <inheritdoc/>
-    public ushort GetColumnOffset( int columnIdx ) => RawSheet.GetColumnOffset( columnIdx );
 
     /// <inheritdoc/>
     public bool HasRow( uint rowId ) => RawSheet.HasRow( rowId );
@@ -272,7 +270,7 @@ public readonly partial struct SubrowExcelSheet< T >
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <inheritdoc/>
-    public override string ToString() => $"{Name}<{typeof( T ).Name}>({Language}, {Variant}, {Count} row(s), {Columns.Count} column(s))";
+    public override string ToString() => $"{Name}<{typeof( T ).Name}>({Language}, {Variant}, {Count} row(s), {Columns.Length} column(s))";
 
     /// <inheritdoc/>
     public bool Equals( SubrowExcelSheet< T > other ) => RawSheet.Equals( other.RawSheet );

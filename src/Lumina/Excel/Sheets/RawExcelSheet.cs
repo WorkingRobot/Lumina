@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Lumina.Data;
@@ -78,7 +79,7 @@ public class RawExcelSheet : IExcelSheet
     public ExcelVariant Variant { get; }
 
     /// <inheritdoc/>
-    public IReadOnlyList< ExcelColumnDefinition > Columns { get; }
+    public ImmutableArray< ExcelColumnDefinition > Columns { get; }
 
     /// <inheritdoc/>
     public uint ColumnHash { get; }
@@ -102,7 +103,7 @@ public class RawExcelSheet : IExcelSheet
         Module = module;
         Language = headerFile.Languages.Contains( language ) ? language : Language.None;
         Variant = headerFile.Header.Variant;
-        Columns = headerFile.ColumnDefinitions;
+        Columns = [..headerFile.ColumnDefinitions];
         ColumnHash = headerFile.GetColumnsHash();
         _rawExcelRows = new RawExcelRow[headerFile.Header.RowCount];
 
@@ -201,9 +202,6 @@ public class RawExcelSheet : IExcelSheet
     public ReadOnlySpan< RawExcelRow > RawRows => _rawExcelRows;
 
     /// <inheritdoc/>
-    public ushort GetColumnOffset( int columnIdx ) => Columns[ columnIdx ].Offset;
-
-    /// <inheritdoc/>
     public bool HasRow( uint rowId )
     {
         ref readonly var lookup = ref GetRawRowOrNullRef( rowId, out _ );
@@ -211,7 +209,7 @@ public class RawExcelSheet : IExcelSheet
     }
 
     /// <inheritdoc/>
-    public override string ToString() => $"{Name}({Language}, {Variant}, {Count} row(s), {Columns.Count} column(s))";
+    public override string ToString() => $"{Name}({Language}, {Variant}, {Count} row(s), {Columns.Length} column(s))";
 
     /// <summary>Gets a row lookup at the given index, if possible.</summary>
     /// <param name="rowId">ID of the desired row.</param>

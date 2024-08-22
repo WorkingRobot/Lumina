@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using Lumina.Data;
 using Lumina.Data.Structs.Excel;
 using Lumina.Excel.Rows;
@@ -24,7 +24,7 @@ internal interface IExcelSheet
     ExcelVariant Variant { get; }
 
     /// <summary>Contains information on the columns in this sheet.</summary>
-    IReadOnlyList< ExcelColumnDefinition > Columns { get; }
+    ImmutableArray< ExcelColumnDefinition > Columns { get; }
 
     /// <summary>Gets the calculated column hash.</summary>
     uint ColumnHash { get; }
@@ -38,12 +38,6 @@ internal interface IExcelSheet
 
     /// <summary>Gets the raw rows.</summary>
     ReadOnlySpan< RawExcelRow > RawRows { get; }
-
-    /// <summary>Gets the offset of the column at <paramref name="columnIdx"/> in the row data.</summary>
-    /// <param name="columnIdx">The index of the column.</param>
-    /// <returns>The offset of the column.</returns>
-    /// <exception cref="IndexOutOfRangeException">Thrown when the column index is invalid. It must be less than <see cref="RawExcelSheet.Columns"/>.Count.</exception>
-    ushort GetColumnOffset( int columnIdx );
 
     /// <summary>Whether this sheet has a row with the given <paramref name="rowId"/>.</summary>
     /// <remarks>If this sheet has subrows, this will check if the row id has any subrows.</remarks>

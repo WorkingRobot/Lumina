@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -73,7 +74,7 @@ public readonly partial struct ExcelSheet< T >
     public ExcelVariant Variant => RawSheet.Variant;
 
     /// <inheritdoc/>
-    public IReadOnlyList< ExcelColumnDefinition > Columns => RawSheet.Columns;
+    public ImmutableArray< ExcelColumnDefinition > Columns => RawSheet.Columns;
 
     /// <inheritdoc/>
     public uint ColumnHash => RawSheet.ColumnHash;
@@ -88,9 +89,6 @@ public readonly partial struct ExcelSheet< T >
 
     /// <inheritdoc cref="GetRow"/>
     public T this[ uint rowId ] => GetRow( rowId );
-
-    /// <inheritdoc/>
-    public ushort GetColumnOffset( int columnIdx ) => RawSheet.GetColumnOffset( columnIdx );
 
     /// <inheritdoc/>
     public bool HasRow( uint rowId ) => RawSheet.HasRow( rowId );
@@ -183,13 +181,13 @@ public readonly partial struct ExcelSheet< T >
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <inheritdoc/>
-    public override string ToString() => $"{Name}<{typeof( T ).Name}>({Language}, {Variant}, {Count} row(s), {Columns.Count} column(s))";
+    public override string ToString() => $"{Name}<{typeof( T ).Name}>({Language}, {Variant}, {Count} row(s), {Columns.Length} column(s))";
 
     /// <inheritdoc/>
-    public bool Equals(ExcelSheet< T > other) => RawSheet.Equals(other.RawSheet);
+    public bool Equals( ExcelSheet< T > other ) => RawSheet.Equals( other.RawSheet );
 
     /// <inheritdoc/>
-    public override bool Equals(object? obj) => obj is ExcelSheet< T > other && Equals(other);
+    public override bool Equals( object? obj ) => obj is ExcelSheet< T > other && Equals( other );
 
     /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine( RawSheet, typeof( T ) );
@@ -199,14 +197,14 @@ public readonly partial struct ExcelSheet< T >
     /// <param name="right">The value to compare with <paramref name="left" />.</param>
     /// <returns>
     /// <see langword="true" /> if <paramref name="left" /> is equal to <paramref name="right" />; otherwise, <see langword="false" />.</returns>
-    public static bool operator ==(ExcelSheet< T > left, ExcelSheet< T > right) => left.Equals(right);
+    public static bool operator ==( ExcelSheet< T > left, ExcelSheet< T > right ) => left.Equals( right );
 
     /// <summary>Compares two values to determine inequality.</summary>
     /// <param name="left">The value to compare with <paramref name="right" />.</param>
     /// <param name="right">The value to compare with <paramref name="left" />.</param>
     /// <returns>
     /// <see langword="true" /> if <paramref name="left" /> is not equal to <paramref name="right" />; otherwise, <see langword="false" />.</returns>
-    public static bool operator !=(ExcelSheet< T > left, ExcelSheet< T > right) => !left.Equals(right);
+    public static bool operator !=( ExcelSheet< T > left, ExcelSheet< T > right ) => !left.Equals( right );
 
     /// <summary>Creates a row at the given index, without checking for bounds or preconditions.</summary>
     /// <param name="rowIndex">Index of the desired row.</param>
