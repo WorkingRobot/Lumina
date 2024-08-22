@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Lumina.Excel;
+using Lumina.Excel.Rows;
 using Lumina.Text;
 using Lumina.Text.Expressions;
 using Lumina.Text.Payloads;
@@ -292,14 +293,13 @@ public class SeStringBuilderTests
     }
 
     [Sheet( "Addon" )]
-    public readonly struct Addon( ExcelPage page, uint offset, uint row ) : IExcelRow<Addon>
+    public readonly struct Addon( RawExcelRow row ) : IExcelRow< Addon >
     {
-        public uint RowId => row;
+        public RawExcelRow RawRow => row;
 
-        public ReadOnlySeString Text => page.ReadString( offset, offset );
+        public ReadOnlySeString Text => row.Page.ReadString( row.Offset, row.Offset );
 
-        static Addon IExcelRow<Addon>.Create( ExcelPage page, uint offset, uint row ) =>
-            new( page, offset, row );
+        static Addon IExcelRow< Addon >.Create( in RawExcelRow row ) => new( row );
     }
 
     [RequiresGameInstallationFact]
@@ -430,9 +430,9 @@ public class SeStringBuilderTests
         };
         foreach( var row in addon )
         {
-            _outputHelper.WriteLine( $"{row.RowId}\t{row.Text.ExtractText()}\t{row.Text}" );
-            if( expected.TryGetValue( row.RowId, out var expectedSeString ) )
-                Assert.True( expectedSeString == row.Text, $"{row.RowId} does not match; expected {expectedSeString}" );
+            _outputHelper.WriteLine( $"{row.RawRow.RowId}\t{row.Text.ExtractText()}\t{row.Text}" );
+            if( expected.TryGetValue( row.RawRow.RowId, out var expectedSeString ) )
+                Assert.True( expectedSeString == row.Text, $"{row.RawRow.RowId} does not match; expected {expectedSeString}" );
         }
     }
 }

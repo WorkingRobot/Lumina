@@ -1,62 +1,42 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Lumina.Data.Attributes;
 using Lumina.Data.Structs.Excel;
-using Lumina.Extensions;
 
-namespace Lumina.Data.Files.Excel
+namespace Lumina.Data.Files.Excel;
+
+/// <summary>Represents an Excel sheet data file.</summary>
+[FileExtension( ".exd" )]
+public class ExcelDataFile : FileResource
 {
-    [FileExtension( ".exd" )]
-    public class ExcelDataFile : FileResource
+    /// <summary>Gets the header of this Excel data file.</summary>
+    public ExcelDataHeader Header { get; protected set; }
+
+    /// <summary>Gets the offsets to rows.</summary>
+    public ExcelDataOffset[] RowOffsets { get; protected set; }= [];
+
+    /// <inheritdoc/>
+    public override void LoadFile()
     {
-        public ExcelDataFile()
-        {
-        }
+        // exd data is always in big endian
+        Reader.IsLittleEndian = false;
 
-        public ExcelDataHeader Header { get; protected set; }
+        Header = ExcelDataHeader.Read( Reader );
 
-        public Dictionary< uint, ExcelDataOffset > RowData { get; protected set; } = null!;
-        
-        internal readonly object ReaderLock = new();
+        if( Header.Magic!= ExcelDataHeader.ExpectedMagic )
+            throw new InvalidDataException( "fucked exd file :(((((" );
 
-        public override unsafe void LoadFile()
-        {
-            // exd data is always in big endian
-            Reader.IsLittleEndian = false;
+        // read offsets
+        var offsetSize = Unsafe.SizeOf< ExcelDataOffset >();
+        var count = Header.IndexSize / offsetSize;
 
-            Header = ExcelDataHeader.Read( Reader );
-
-            if(
-                Header.Magic[ 0 ] != 'E' ||
-                Header.Magic[ 1 ] != 'X' ||
-                Header.Magic[ 2 ] != 'D' ||
-                Header.Magic[ 3 ] != 'F' )
-            {
-                throw new InvalidDataException( "fucked exd file :(((((" );
-            }
-
-            // read offsets
-            var offsetSize = Unsafe.SizeOf< ExcelDataOffset >();
-            var count = Header.IndexSize / offsetSize;
-
-            var rowDataTmp = new ExcelDataOffset[count];
-            for( int i = 0; i < count; i++ ) rowDataTmp[ i ] = ExcelDataOffset.Read( Reader );
-            
-            RowData = rowDataTmp.ToDictionary( id => id.RowId, row => row );
-        }
-
-        public Span< byte > GetSpanForRow( uint rowId )
-        {
-            var offset = (int)RowData[ rowId ].Offset;
-            return DataSpan.Slice( offset );
-        }
-
-        public Span< byte > GetSpanForRow( uint rowId, uint subrowId )
-        {
-            throw new NotImplementedException();
-        }
+        RowOffsets = new ExcelDataOffset[count];
+        for( var i = 0; i < count; i++ )
+            RowOffsets[i] = ExcelDataOffset.Read( Reader );
     }
+
+    /// <summary>Gets the row header at the given offset.</summary>
+    /// <param name="offset">Offset to retrieve from.</param>
+    /// <returns>Row header.</returns>
+    public ExcelDataRowHeader GetRowHeaderAt( uint offset ) => ExcelDataRowHeader.FromSpan( DataSpan[ (int)offset.. ] );
 }

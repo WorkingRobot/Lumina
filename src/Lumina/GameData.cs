@@ -9,6 +9,8 @@ using Lumina.Data.Structs;
 using Lumina.Data.Structs.Excel;
 using Lumina.Excel;
 using Lumina.Excel.Exceptions;
+using Lumina.Excel.Rows;
+using Lumina.Excel.Sheets;
 using Lumina.Misc;
 
 // ReSharper disable MemberCanBePrivate.Global
@@ -299,11 +301,11 @@ namespace Lumina
         /// </remarks>
         /// <exception cref="SheetNameEmptyException">Sheet name was not specified neither via <typeparamref name="T"/>'s <see cref="SheetAttribute.Name"/> nor <paramref name="name"/>.</exception>
         /// <exception cref="SheetAttributeMissingException"><typeparamref name="T"/> does not have a valid <see cref="SheetAttribute"/>.</exception>
-        public ExcelSheet< T >? GetExcelSheet< T >( Language? language = null, string? name = null ) where T : struct, IExcelRow< T >
+        public ExcelSheet< T >? GetExcelSheet< T >( Language? language = null, string? name = null ) where T : IExcelRow< T >
         {
             try
             {
-                return Excel.GetSheet< T >( language, name );
+                return Excel.GetSheet< T >( name, language );
             }
             catch( Exception e ) when ( e is SheetNotFoundException or MismatchedColumnHashException or NotSupportedException or UnsupportedLanguageException )
             {
@@ -313,11 +315,11 @@ namespace Lumina
 
         /// <summary>Loads a <see cref="SubrowExcelSheet{T}"/>. Returns <see langword="null"/> if the sheet does not exist, has an invalid column hash or unsupported variant, or was requested with an unsupported language.</summary>
         /// <inheritdoc cref="GetExcelSheet{T}(Nullable{Language}, string?)"/>
-        public SubrowExcelSheet< T >? GetSubrowExcelSheet< T >( Language? language = null, string? name = null ) where T : struct, IExcelSubrow< T >
+        public SubrowExcelSheet< T >? GetSubrowExcelSheet< T >( Language? language = null, string? name = null ) where T : IExcelRow< T >
         {
             try
             {
-                return Excel.GetSubrowSheet< T >( language, name );
+                return Excel.GetSubrowSheet< T >( name, language );
             }
             catch( Exception e ) when ( e is SheetNotFoundException or MismatchedColumnHashException or NotSupportedException or UnsupportedLanguageException )
             {

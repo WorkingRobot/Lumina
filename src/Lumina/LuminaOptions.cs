@@ -31,6 +31,9 @@ namespace Lumina
         /// </summary>
         public bool PanicOnSheetChecksumMismatch { get; set; } = true;
 
+        /// <summary>Gets or sets a value indicating whether to cache Excel rows that are of reference types.</summary>
+        public bool CacheReferenceTypeRowInstances { get; set; } = true;
+
         /// <summary>
         /// The resolver delegate to use when resolving RSV strings. Leave <see langword="null"/> if you don't need it.
         /// </summary>
