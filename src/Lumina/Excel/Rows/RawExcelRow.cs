@@ -13,7 +13,7 @@ namespace Lumina.Excel.Rows;
 /// <param name="SubrowDataOffset">Offset of the subrow data, or <c>0</c> if the sheet does not support subrows.</param>
 /// <param name="SubrowCount">Number of subrows in the row, or <c>1</c> if the sheet does not support subrows.</param>
 /// <param name="SubrowId">ID of the subrow in the row, or <c>0</c> if the sheet does not support subrows.</param>
-[StructLayout( LayoutKind.Sequential, Size = 24 )]
+[StructLayout( LayoutKind.Sequential )]
 public readonly record struct RawExcelRow(
     ExcelPage Page,
     uint RowId,
