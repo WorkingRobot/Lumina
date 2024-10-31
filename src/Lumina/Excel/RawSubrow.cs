@@ -81,8 +81,11 @@ public readonly struct RawSubrow( ExcelPage page, uint offset, uint row, ushort 
     public ulong ReadUInt64Column( int columnIdx ) =>
         ReadUInt64( GetColumnOffset( columnIdx ) );
 
-    public bool ReadPackedBoolColumn( int columnIdx, byte bit ) =>
-        ReadPackedBool( GetColumnOffset( columnIdx ), bit );
+    public bool ReadPackedBoolColumn( int columnIdx )
+    {
+        var column = page.Sheet.Columns[columnIdx];
+        return ReadPackedBool( column.Offset, (byte)( column.Type - ExcelColumnDataType.PackedBool0 ) );
+    }
 
     static RawSubrow IExcelSubrow<RawSubrow>.Create( ExcelPage page, uint offset, uint row, ushort subrow ) =>
         new( page, offset, row, subrow );

@@ -115,8 +115,11 @@ public readonly struct RawRow( ExcelPage page, uint offset, uint row ) : IExcelR
     public ulong ReadUInt64Column( int columnIdx ) =>
         ReadUInt64( GetColumnOffset( columnIdx ) );
 
-    public bool ReadPackedBoolColumn( int columnIdx, byte bit ) =>
-        ReadPackedBool( GetColumnOffset( columnIdx ), bit );
+    public bool ReadPackedBoolColumn( int columnIdx )
+    {
+        var column = page.Sheet.Columns[columnIdx];
+        return ReadPackedBool( column.Offset, (byte)( column.Type - ExcelColumnDataType.PackedBool0 ) );
+    }
 
     static RawRow IExcelRow<RawRow>.Create( ExcelPage page, uint offset, uint row ) =>
         new( page, offset, row );
