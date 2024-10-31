@@ -13,9 +13,11 @@ public readonly struct RawRow( ExcelPage page, uint offset, uint row ) : IExcelR
     public ExcelPage Page => page;
 
     /// <summary>
-    /// 
+    /// The offset to the row inside the page.
     /// </summary>
     public uint Offset => offset;
+    
+    /// <inheritdoc />
     public uint RowId => row;
 
     public IReadOnlyList< ExcelColumnDefinition > Columns =>

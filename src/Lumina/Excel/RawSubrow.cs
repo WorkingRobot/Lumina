@@ -1,16 +1,55 @@
+using Lumina.Data.Structs.Excel;
 using Lumina.Text.ReadOnly;
+using System;
+using System.Collections.Generic;
 
 namespace Lumina.Excel;
 
 public readonly struct RawSubrow( ExcelPage page, uint offset, uint row, ushort subrow ) : IExcelSubrow<RawSubrow>
 {
+    /// <summary>
+    /// The associated <see cref="ExcelPage"/> of the row.
+    /// </summary>
     public ExcelPage Page => page;
+
+    /// <summary>
+    /// The offset to the row inside the page.
+    /// </summary>
     public uint Offset => offset;
+
+    /// <inheritdoc />
     public uint RowId => row;
+    
+    /// <inheritdoc />
     public ushort SubrowId => subrow;
+
+    public IReadOnlyList< ExcelColumnDefinition > Columns =>
+        page.Sheet.Columns;
 
     public ushort GetColumnOffset( int columnIdx ) =>
         page.Sheet.GetColumnOffset( columnIdx );
+
+    public object ReadColumn( int columnIdx )
+    {
+        var column = page.Sheet.Columns[columnIdx];
+        return column.Type switch
+        {
+            ExcelColumnDataType.String => ReadString( column.Offset ),
+            ExcelColumnDataType.Bool => ReadBool( column.Offset ),
+            ExcelColumnDataType.Int8 => ReadInt8( column.Offset ),
+            ExcelColumnDataType.UInt8 => ReadUInt8( column.Offset ),
+            ExcelColumnDataType.Int16 => ReadInt16( column.Offset ),
+            ExcelColumnDataType.UInt16 => ReadUInt16( column.Offset ),
+            ExcelColumnDataType.Int32 => ReadInt32( column.Offset ),
+            ExcelColumnDataType.UInt32 => ReadUInt32( column.Offset ),
+            ExcelColumnDataType.Float32 => ReadFloat32( column.Offset ),
+            ExcelColumnDataType.Int64 => ReadInt64( column.Offset ),
+            ExcelColumnDataType.UInt64 => ReadUInt64( column.Offset ),
+            >= ExcelColumnDataType.PackedBool0 and <= ExcelColumnDataType.PackedBool7 =>
+                page.ReadPackedBool( column.Offset, (byte)( column.Type - ExcelColumnDataType.PackedBool0 ) ),
+            _ => throw new InvalidOperationException( $"Unknown column type {column.Type}" )
+        };
+    }
 
     public ReadOnlySeString ReadString( nuint offset ) =>
         page.ReadString( Offset + offset, Offset );
