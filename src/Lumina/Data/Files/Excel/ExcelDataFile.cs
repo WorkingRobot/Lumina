@@ -48,13 +48,15 @@ namespace Lumina.Data.Files.Excel
             RowData = rowDataTmp.ToDictionary( id => id.RowId, row => row );
         }
 
-        public Span< byte > GetSpanForRow( uint rowId )
+        [Obsolete]
+        public Span<byte> GetSpanForRow( uint rowId )
         {
-            var offset = (int)RowData[ rowId ].Offset;
+            var offset = (int)RowData[rowId].Offset;
             return DataSpan.Slice( offset );
         }
 
-        public Span< byte > GetSpanForRow( uint rowId, uint subrowId )
+        [Obsolete]
+        public Span<byte> GetSpanForRow( uint rowId, uint subrowId )
         {
             throw new NotImplementedException();
         }

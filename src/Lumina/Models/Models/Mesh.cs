@@ -114,12 +114,15 @@ namespace Lumina.Models.Models {
         private void ReadIndices()
         {
             var currentMesh = Parent.File.Meshes[ MeshIndex ];
-            
-            var reader = new LuminaBinaryReader( new MemoryStream( Parent.File.Data, 
-                    (int) Parent.File.FileHeader.IndexOffset[ (int) Parent.Lod ],
-                    (int) Parent.File.FileHeader.IndexBufferSize[ (int) Parent.Lod ] ) );
-            reader.Seek( currentMesh.StartIndex * 2 );
-            Indices = reader.ReadUInt16Array( (int) currentMesh.IndexCount );
+
+            var sectionOffset = Parent.File.FileHeader.IndexOffset[(int)Parent.Lod];
+            var sectionSize = Parent.File.FileHeader.IndexBufferSize[(int)Parent.Lod];
+            var byteOffset = currentMesh.StartIndex * sizeof( ushort );
+            if( byteOffset + currentMesh.IndexCount * sizeof( ushort ) >= sectionSize )
+                throw new InvalidOperationException();
+
+            Parent.File.Reader.Seek( sectionOffset + byteOffset );
+            Indices = Parent.File.Reader.ReadUInt16Array( (int) currentMesh.IndexCount );
         }
 
         private void ReadVertices()
@@ -132,11 +135,14 @@ namespace Lumina.Models.Models {
             Vertices = new Vertex[currentMesh.VertexCount];
 
             // Vertices may be defined across at most 3 streams defined by a Mesh's VertexDeclarations
+
+            var sectionOffset = Parent.File.FileHeader.VertexOffset[(int)Parent.Lod];
+            var sectionSize = Parent.File.FileHeader.VertexBufferSize[(int)Parent.Lod];
+
+            var section = Parent.File.Reader.ReadRawOffsetData( sectionOffset, checked((int)sectionSize) );
             var vertexStreamReader = new LuminaBinaryReader[3];
             for( int i = 0; i < 3; i++ ) {
-                vertexStreamReader[ i ] = new LuminaBinaryReader( new MemoryStream( Parent.File.Data, 
-                        (int) Parent.File.FileHeader.VertexOffset[ (int) Parent.Lod ],
-                        (int) Parent.File.FileHeader.VertexBufferSize[ (int) Parent.Lod ] ) );
+                vertexStreamReader[ i ] = new LuminaBinaryReader( section );
                 vertexStreamReader[ i ].Seek( currentMesh.VertexBufferOffset[ i ] );
             }
 

@@ -15,7 +15,7 @@ public sealed class RequiresGameInstallationFact : FactAttribute
 
     public static GameData CreateGameData()
     {
-        return new( Path, new()
+        return new( Path, new LuminaOptions()
         {
             PanicOnSheetChecksumMismatch = false,
         } );

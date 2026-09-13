@@ -54,7 +54,7 @@ namespace Lumina.Extensions
         /// <returns>An array containing the structures read from the stream</returns>
         public static T[] ReadStructuresAsArray< T >( this BinaryReader br, int count ) where T : struct
         {
-            return br.ReadStructuresAsSpan< T >( count ).ToArray();
+            return [..br.ReadStructuresAsSpan< T >( count )];
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace Lumina.Extensions
 
             br.BaseStream.Position = originalPosition;
 
-            return chars.ToArray();
+            return [.. chars];
         }
         
         public static string ReadStringData( this BinaryReader br )
@@ -117,8 +117,23 @@ namespace Lumina.Extensions
             {
                 chars.Add( current );
             }
-            
-            return Encoding.UTF8.GetString( chars.ToArray(), 0, chars.Count );
+
+            return Encoding.UTF8.GetString( CollectionsMarshal.AsSpan( chars ) );
+        }
+
+        public static byte[] ReadRawOffsetData( this BinaryReader br, Range range )
+        {
+            var (offset, length) = range.GetOffsetAndLength(checked((int)br.BaseStream.Length));
+            return br.ReadRawOffsetData( offset, length );
+        }
+
+        public static byte[] ReadRawOffsetData( this BinaryReader br, long offset, int length )
+        {
+            var pos = br.BaseStream.Position;
+            br.BaseStream.Position = offset;
+            var data = br.ReadBytes( length );
+            br.BaseStream.Position = pos;
+            return data;
         }
 
         /// <summary>

@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Lumina.Data.Attributes;
 using Lumina.Data.Parsing.Tex.Buffers;
+using Lumina.Extensions;
 
 // ReSharper disable InconsistentNaming
 
@@ -322,7 +323,7 @@ namespace Lumina.Data.Files
         /// <param name="height">Height of mipmap.</param>
         /// <returns>The slice data.</returns>
         /// <remarks>Note that the length of span may be less than sliceSize, in which case, the truncated data should be treated as zeroes.</remarks>
-        public unsafe Span< byte > SliceSpan( int mipmapIndex, int sliceIndex, out int sliceSize, out int width, out int height )
+        public unsafe byte[] Slice( int mipmapIndex, int sliceIndex, out int sliceSize, out int width, out int height )
         {
             sliceSize = SliceSize( mipmapIndex, out width, out height );
             if( mipmapIndex < 0 || mipmapIndex >= Math.Max( Header.MipCount, 1 ) )
@@ -340,7 +341,7 @@ namespace Lumina.Data.Files
             }
 
             var offset = (int) Header.OffsetToSurface[ mipmapIndex ] + sliceIndex * sliceSize;
-            return offset >= Data.Length ? new() : Data.AsSpan( offset, Math.Min( Data.Length - offset, sliceSize ) );
+            return offset >= Reader.BaseStream.Length ? [] : Reader.ReadRawOffsetData( offset, (int)Math.Min( Reader.BaseStream.Length - offset, sliceSize ) );
         }
 
         /// <summary>

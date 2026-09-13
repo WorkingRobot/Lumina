@@ -105,12 +105,12 @@ public class RawExcelSheet : IExcelSheet
             var pageDef = headerFile.DataPages[ pageIdx ];
             var filePath = Language == Language.None
                 ? $"exd/{name}_{pageDef.StartId}.exd"
-                : $"exd/{name}_{pageDef.StartId}_{LanguageUtil.GetLanguageStr( Language )}.exd";
+                : $"exd/{name}_{pageDef.StartId}_{Language.GetName()}.exd";
             var fileData = module.GameData.GetFile< ExcelDataFile >( filePath );
             if( fileData == null )
                 continue;
 
-            var newPage = _pages[ pageIdx ] = new( this, fileData.Data, headerFile.Header.DataOffset );
+            var newPage = _pages[ pageIdx ] = new( this, fileData.Reader.ReadRawOffsetData(0, checked((int)fileData.Reader.BaseStream.Length)), headerFile.Header.DataOffset );
 
             // If row count information from exh file is incorrect, cope with it.
             if( i + fileData.RowData.Count > _rowOffsetLookupTable.Length )

@@ -1,15 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Hashing;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Lumina.Data;
-using Lumina.Data.Structs;
-using Lumina.Data.Structs.Excel;
 using Lumina.Excel;
 using Lumina.Excel.Exceptions;
-using Lumina.Misc;
 
 // ReSharper disable MemberCanBePrivate.Global
 
@@ -22,92 +21,87 @@ namespace Lumina
         /// <summary>
         /// The current data path that Lumina is using to load files.
         /// </summary>
-        public DirectoryInfo DataPath { get; private set; }
+        public DirectoryInfo DataPath { get; }
 
         /// <summary>
-        /// Provides access to each <see cref="Repository"/>, which contains the base game content or expansion content. Each folder inside the sqpack
+        /// Provides access to each <see cref="RepositoryInfo"/>, which contains the base game content or expansion content. Each folder inside the sqpack
         /// directory is a repository.
         /// </summary>
-        public Dictionary< string, Repository > Repositories { get; private set; }
+        public List<RepositoryInfo> Repositories => Vfs.Repositories;
 
         /// <summary>
         /// Provides access to <see cref="LuminaOptions"/> at runtime. Most of these can be changed without issue without having to create a new instance.
         /// </summary>
-        public LuminaOptions Options { get; private set; }
+        public LuminaOptions Options { get; }
 
         /// <summary>
         /// Reading PS3 dats on a LE machine means we need to convert endianness from BE where applicable
         /// </summary>
         [Obsolete( "Use property \"ConvertEndianness\" from \"LuminaBinaryReader\" instead" )]
-        public bool ShouldConvertEndianness => Options.CurrentPlatform == PlatformId.PS3 && BitConverter.IsLittleEndian;
-        
+        public bool ShouldConvertEndianness => Options.CurrentPlatform == PlatformType.PS3 && BitConverter.IsLittleEndian;
+
+        /// <summary>
+        /// The virtual filesystem that .dat data is loaded into.
+        /// </summary>
+        public SqPackVfs Vfs { get; }
+
         /// <summary>
         /// Provides access to EXD/EXH data, internally called Excel.
         ///
         /// Loaded by default on init unless you opt not to load it.
         /// </summary>
-        public ExcelModule Excel { get; private set; }
+        public ExcelModule Excel { get; }
         
         /// <summary>
         /// Provides access to the <see cref="FileHandleManager"/> which allows you to create new <see cref="FileHandle{T}"/>s which then allows you to
         /// easily defer file loading onto another thread.
         /// </summary>
-        public FileHandleManager FileHandleManager { get; private set; }
+        public FileHandleManager FileHandleManager { get; }
 
-        /// <summary>
-        /// Provides a pool for file streams for .dat files.
-        /// </summary>
-        /// <remarks>The pool will be disposed when <see cref="Dispose()"/> is called.</remarks>
-        public SqPackStreamPool? StreamPool { get; set; }
-        
-        internal ILogger? Logger { get; private set; }
-        
         /// <summary>
         /// Provides access to the current <see cref="GameData"/> object that was invoked on this thread (if any).
         /// </summary>
-        public static ThreadLocal< GameData >? CurrentContext { get; private set; }
+        public static GameData? CurrentContext => currentContext;
+
+        [ThreadStatic]
+        private static GameData? currentContext;
 
         /// <summary>
-        /// Constructs a new Lumina object allowing access to game data.
+        /// Constructs a new <see cref="GameData"/> allowing access to game data.
         /// </summary>
         /// <param name="dataPath">Path to the sqpack directory</param>
         /// <param name="options">Options object to provide additional configuration</param>
+        /// <param name="ignoreDataPathName">If <see langword="true"/>, <paramref name="dataPath"/> is allowed to be named something other than "sqpack" without throwing an <see cref="ArgumentException"/>.</param>
         /// <exception cref="DirectoryNotFoundException">Thrown when the sqpack directory supplied is missing.</exception>
-        public GameData( string dataPath, LuminaOptions? options = null! )
+        /// <exception cref="ArgumentException">Thrown when <paramref name="dataPath"/> does not point to a directory with the name "sqpack" and when <paramref name="ignoreDataPathName"/> is <see langword="false"/>.</exception>
+        public GameData( string dataPath, LuminaOptions? options = null, bool ignoreDataPathName = false)
         {
-            Options = options ?? new LuminaOptions();
-
-            DataPath = new DirectoryInfo( dataPath );
+            DataPath = new( dataPath );
 
             if( !DataPath.Exists )
             {
-                throw new DirectoryNotFoundException( "DataPath provided is missing." );
+                throw new DirectoryNotFoundException($"Directory not found: {DataPath.FullName}");
             }
             
-            if( DataPath.Name != "sqpack" )
+            if( !ignoreDataPathName && DataPath.Name != "sqpack" )
             {
-                throw new ArgumentException( "the data path arg must point to the sqpack directory", nameof( dataPath ) );
+                throw new ArgumentException( "Directory must be named 'sqpack'", nameof( dataPath ) );
             }
 
-            if( options?.LoadMultithreaded == true )
-            {
-                var repoTasks = DataPath.GetDirectories().Select( repo => Task.Run( () => new Repository( repo, this ) ) );
-                Repositories = Task.WhenAll( repoTasks )
-                    .GetAwaiter()
-                    .GetResult()
-                    .ToDictionary( x => x.Name.ToLowerInvariant(), x => x );
-            }
-            else
-            {
-                Repositories = new Dictionary< string, Repository >();
-                foreach( var repo in DataPath.GetDirectories() )
-                {
-                    Repositories[ repo.Name.ToLowerInvariant() ] = new Repository( repo, this );
-                }
-            }
+            Options = options ?? new();
+            Vfs = new( this );
 
-            Excel = new ExcelModule( this );
-            FileHandleManager = new FileHandleManager( this );
+            Vfs.Initialize().GetAwaiter().GetResult();
+
+            Excel = new( this );
+            FileHandleManager = new( this );
+        }
+
+        private static LuminaOptions AddLoggerToOptions( ILogger logger, LuminaOptions? options )
+        {
+            options ??= new();
+            options.Logger = logger;
+            return options;
         }
 
         /// <summary>
@@ -117,9 +111,9 @@ namespace Lumina
         /// <param name="logger">An <see cref="ILogger"/> implementation that Lumina can send log events to</param>
         /// <param name="options">Options object to provide additional configuration</param>
         /// <exception cref="DirectoryNotFoundException">Thrown when the sqpack directory supplied is missing.</exception>
-        public GameData( string dataPath, ILogger logger, LuminaOptions? options = null! ) : this(dataPath, options)
+        [Obsolete( "Use the LuminaOptions.Logger property" )]
+        public GameData( string dataPath, ILogger logger, LuminaOptions? options = null ) : this( dataPath, AddLoggerToOptions(logger, options) )
         {
-            Logger = logger ?? throw new ArgumentNullException( nameof( logger ) );
         }
 
         /// <summary>
@@ -129,36 +123,14 @@ namespace Lumina
         /// <returns>A <see cref="ParsedFilePath"/> which contains extracted info from the path, along with the hashes used to access the file index</returns>
         public static ParsedFilePath? ParseFilePath( string path )
         {
-            if( string.IsNullOrWhiteSpace( path ) )
-                return null;
-            
-            // validate path slightly
-            if( path[ ^1 ] == '/' )
-                return null;
-
-            path = path.ToLowerInvariant().Trim();
-            
-            var pathParts = path.Split( '/' );
-            var category = pathParts.First();
-
-            var hash = GetFileHash( path );
-            var hash2 = Crc32.Get( path );
-
-            var repo = pathParts[ 1 ];
-            // todo: supports up to ex9, so we've got another ~11 years before this breaks
-            if( repo[ 0 ] != 'e' || repo[ 1 ] != 'x' || !char.IsDigit( repo[ 2 ] ) )
+            try
             {
-                repo = "ffxiv";
+                return new( path );
             }
-
-            return new ParsedFilePath
+            catch( ArgumentException )
             {
-                Category = category,
-                IndexHash = hash,
-                Index2Hash = hash2,
-                Repository = repo,
-                Path = path
-            };
+                return null;
+            }
         }
 
         /// <inheritdoc/>
@@ -173,9 +145,9 @@ namespace Lumina
         /// </summary>
         /// <param name="path">A path to a file located inside the game's filesystem</param>
         /// <returns>The base <see cref="FileResource"/> if it was found, or null if it wasn't found</returns>
-        public FileResource? GetFile( string path )
+        public FileResource GetFile( string path )
         {
-            return GetFile< FileResource >( path );
+            return GetFile<FileResource>( path );
         }
 
         /// <summary>
@@ -184,22 +156,49 @@ namespace Lumina
         /// <param name="path">A path to a file located inside the game's filesystem</param>
         /// <typeparam name="T">The type of <see cref="FileResource"/> to load the raw file in to</typeparam>
         /// <returns>Returns the requested file if found, null if not</returns>
-        public T? GetFile< T >( string path ) where T : FileResource
+        public T GetFile<T>( string path ) where T : FileResource
         {
-            SetCurrentContext();
-            
-            var parsed = ParseFilePath( path );
-            if( parsed == null )
-            {
-                return null;
-            }
-            
-            if( Repositories.TryGetValue( parsed.Repository, out var repo ) )
-            {
-                return repo.GetFile< T >( parsed.Category, parsed );
-            }
+            var stream = Vfs.GetFileStream( path );
 
-            return null;
+            SetCurrentContext();
+            var file = Activator.CreateInstance< T >();
+
+            file.Reader = new LuminaBinaryReader( stream, Options.CurrentPlatform );
+
+            file.LoadFile();
+
+            return file;
+        }
+
+        /// <summary>
+        /// Load a raw file given a game file path
+        /// </summary>
+        /// <param name="path">A path to a file located inside the game's filesystem</param>
+        /// <returns>The base <see cref="FileResource"/> if it was found, or <see langword="null"/> if it wasn't found</returns>
+        public FileResource? TryGetFile( string path )
+        {
+            return TryGetFile<FileResource>( path );
+        }
+
+        /// <summary>
+        /// Load a defined file given a game file path
+        /// </summary>
+        /// <param name="path">A path to a file located inside the game's filesystem</param>
+        /// <typeparam name="T">The type of <see cref="FileResource"/> to load the raw file in to</typeparam>
+        /// <returns>Returns the requested file if found, <see langword="null"/> if not</returns>
+        public T? TryGetFile<T> (string path) where T : FileResource
+        {
+            if( Vfs.TryGetFileStream( path ) is not { } stream )
+                return null;
+
+            SetCurrentContext();
+            var file = Activator.CreateInstance<T>();
+
+            file.Reader = new LuminaBinaryReader( stream, Options.CurrentPlatform );
+
+            file.LoadFile();
+
+            return file;
         }
 
         /// <summary>
@@ -212,8 +211,6 @@ namespace Lumina
         /// <exception cref="FileNotFoundException">The path given doesn't point to an existing file</exception>
         public T GetFileFromDisk< T >( string path, string? origPath = null ) where T : FileResource
         {
-            SetCurrentContext();
-            
             if( !File.Exists( path ) )
             {
                 throw new FileNotFoundException( "the file at the specified path doesn't exist" );
@@ -222,36 +219,15 @@ namespace Lumina
             var fileContent = File.ReadAllBytes( path );
 
             var file = Activator.CreateInstance< T >();
-            file.Data = fileContent;
             if( origPath != null )
             {
-                file.FilePath = ParseFilePath( origPath )!;
+                throw new NotImplementedException();
+                //file.FilePath = new( )!;
             }
-            file.Reader = new LuminaBinaryReader( file.Data, Options.CurrentPlatform );
+            file.Reader = new LuminaBinaryReader( fileContent, Options.CurrentPlatform );
             file.LoadFile();
 
             return file;
-        }
-
-        /// <summary>
-        /// Returns file metadata pulled directly from the file header inside the SqPack
-        /// </summary>
-        /// <param name="path">A path to a file located inside the game's filesystem</param>
-        /// <returns>A <see cref="SqPackFileInfo"/> if it was found, null if not</returns>
-        public SqPackFileInfo? GetFileMetadata( string path )
-        {
-            var parsed = ParseFilePath( path );
-            if( parsed == null )
-            {
-                return null;
-            }
-            
-            if( Repositories.TryGetValue( parsed.Repository, out var repo ) )
-            {
-                return repo.GetFileMetadata( parsed.Category, parsed );
-            }
-
-            return null;
         }
 
         /// <summary>
@@ -259,32 +235,22 @@ namespace Lumina
         /// </summary>
         /// <param name="path">The full path of the file</param>
         /// <returns>True if the file exists</returns>
-        public bool FileExists( string path )
-        {
-            var parsedPath = ParseFilePath( path );
-            if( parsedPath == null )
-                return false;
-
-            if( Repositories.TryGetValue( parsedPath.Repository, out var repo ) )
-            {
-                return repo.FileExists( parsedPath.Category, parsedPath );
-            }
-
-            return false;
-        }
+        public bool ContainsFile( string path ) =>
+            Vfs.ContainsFile( path );
 
         /// <summary>
         /// Returns the index variant of a file hash
         /// </summary>
         /// <param name="path">The full path of the file</param>
         /// <returns>A U64 containing a split hash of the folder and file CRC32s</returns>
-        public static UInt64 GetFileHash( string path )
+        [Obsolete("V0 Path Hash", error: true)]
+        public static ulong GetFileHash( string path )
         {
             var pathParts = path.Split( '/' );
             var filename = pathParts[ ^1 ];
-            var folder = path.Substring( 0, path.LastIndexOf( '/' ) );
+            var folder = path[..path.LastIndexOf( '/' )];
 
-            return (UInt64) Crc32.Get( folder ) << 32 | Crc32.Get( filename );
+            return (ulong)Crc32.HashToUInt32( Encoding.ASCII.GetBytes( folder ) ) << 32 | Crc32.HashToUInt32( Encoding.ASCII.GetBytes( filename ) );
         }
 
         /// <summary>Loads an <see cref="ExcelSheet{T}"/>. Returns <see langword="null"/> if the sheet does not exist, has an invalid column hash or unsupported variant, or was requested with an unsupported language.</summary>
@@ -345,25 +311,17 @@ namespace Lumina
             FileHandleManager.ProcessQueue();
         }
 
+        internal void SetCurrentContext() =>
+            currentContext = this;
+
         /// <summary>Disposes this object.</summary>
         /// <param name="disposing">Whether this function is being called from <see cref="Dispose"/>.</param>
         protected virtual void Dispose( bool disposing )
         {
             if( disposing )
             {
-                StreamPool?.Dispose();
-                StreamPool = null;
+
             }
-        }
-
-        internal void SetCurrentContext()
-        {
-            SetCurrentContext( this );
-        }
-
-        internal static void SetCurrentContext( GameData gameData )
-        {
-            CurrentContext = new(() => gameData);
         }
     }
 }
