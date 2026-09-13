@@ -8,9 +8,8 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Hashing;
 using System.Linq;
-using System.Text;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using static Lumina.Data.RepositoryInfo;
 
@@ -25,7 +24,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
     public delegate bool ResolveRsfDelegate( ulong indexHash, out ReadOnlyMemory<byte> resolvedData );
 
     // (Expansion, Category) + Hash -> DataFile, ChunkIdx, Offset
-    private FrozenDictionary<int, FrozenDictionary<int, SqPackValue>>? HashTable { get; set; }
+    private FrozenDictionary<int, FrozenDictionary<uint, SqPackValue>>? HashTable { get; set; }
     private FrozenDictionary<string, SqPackValue>? CollisionTable { get; set; }
 
     private ConcurrentDictionary<(SqPackKey Key, byte ChunkIdx, byte DatFile), MappedFile> OpenedFiles { get; set; } = [];
@@ -40,7 +39,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
         foreach( var dir in Path.GetDirectories() )
             tasks.Add( AddRepository( dir ) );
 
-        var hashTable = new Dictionary<int, FrozenDictionary<int, SqPackValue>>();
+        var hashTable = new Dictionary<int, FrozenDictionary<uint, SqPackValue>>();
         var synonymData = new List<Dictionary<string, SqPackValue>>();
         while( tasks.Count != 0 )
         {
@@ -60,23 +59,35 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
         GameData.Options.Logger?.Information( $"Initialized {Repositories.Count} repositories in {sw.Elapsed.TotalMilliseconds:0.00}ms" );
     }
 
-    private readonly record struct RepositoryData( byte ExpansionId, Dictionary<CategoryType, FrozenDictionary<int, SqPackValue>> HashTables, List<Dictionary<string, SqPackValue>> Synonyms);
+    private readonly record struct RepositoryData( byte ExpansionId, Dictionary<CategoryType, FrozenDictionary<uint, SqPackValue>> HashTables, List<Dictionary<string, SqPackValue>> Synonyms);
 
     private async Task<RepositoryData> AddRepository( DirectoryInfo repositoryPath )
     {
         var repo = new RepositoryInfo( repositoryPath );
         Repositories.Add( repo );
 
-        var hashTable = new Dictionary<CategoryType, Dictionary<int, SqPackValue>>();
+        var hashTable = new Dictionary<CategoryType, Dictionary<uint, SqPackValue>>();
         var synonymData = new List<Dictionary<string, SqPackValue>>();
 
+        var indexFiles = repo.GetIndexFiles( GameData.Options.CurrentPlatform ).ToList();
+        var capacities = new Dictionary<CategoryType, int>();
+        foreach( var indexFile in indexFiles )
+            capacities[indexFile.Category] = capacities.GetValueOrDefault( indexFile.Category )
+                + checked((int)( indexFile.File.Length / Unsafe.SizeOf<SqPackIndexTablePair<uint>>() ));
+
         var taskOrder = new Dictionary<CategoryType, Task<IndexData>>();
-        foreach( var indexFile in repo.GetIndexFiles( GameData.Options.CurrentPlatform ) )
+        foreach( var indexFile in indexFiles )
         {
             var key = indexFile.Category;
-            var dict = hashTable.GetOrAdd( key );
+            if( !hashTable.TryGetValue( key, out var dict ) )
+                hashTable[key] = dict = new( capacities[key] );
             if( taskOrder.TryGetValue( key, out var dependentTask ) )
-                taskOrder[key] = dependentTask.ContinueWith( _ => Task.Run( () => AddIndex( indexFile, dict ) ) ).Unwrap();
+                taskOrder[key] = dependentTask.ContinueWith(
+                    t => {
+                        t.GetAwaiter().GetResult();
+                        return Task.Run( () => AddIndex( indexFile, dict ) );
+                    },
+                    TaskContinuationOptions.ExecuteSynchronously ).Unwrap();
             else
                 taskOrder[key] = Task.Run( () => AddIndex( indexFile, dict ) );
         }
@@ -86,7 +97,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
         {
             var finishedTask = await Task.WhenAny( tasks ).ConfigureAwait( false );
             tasks.Remove( finishedTask );
-            var (_, synonyms, _) = finishedTask.Result;
+            var (_, synonyms, _) = await finishedTask.ConfigureAwait( false );
 
             if( synonyms.Count != 0 )
                 synonymData.Add( synonyms );
@@ -95,9 +106,9 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
         return new( repo.ExpansionId, hashTable.ToDictionary( x => x.Key, x => x.Value.ToFrozenDictionary() ), synonymData );
     }
 
-    private readonly record struct IndexData( Dictionary<int, SqPackValue> Entries, Dictionary<string, SqPackValue> Synonyms, IndexFileInfo IndexFile );
+    private readonly record struct IndexData( Dictionary<uint, SqPackValue> Entries, Dictionary<string, SqPackValue> Synonyms, IndexFileInfo IndexFile );
 
-    private static IndexData AddIndex( IndexFileInfo indexFile, Dictionary<int, SqPackValue> entryTable )
+    private static IndexData AddIndex( IndexFileInfo indexFile, Dictionary<uint, SqPackValue> entryTable )
     {
         using var index = new MappedFile( indexFile.File );
         index.Prefetch( 0, index.Size );
@@ -116,7 +127,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
         {
             var entries = index.GetByteSpanAt<SqPackIndexTablePair<uint>>( header.IndexData.Offset, header.IndexData.Size );
             foreach( var entry in entries.Span )
-                entryTable.Add( unchecked((int)entry.Hash), new( entry.Data, indexFile.ChunkIndex ) );
+                entryTable.TryAdd( entry.Hash, new( entry.Data, indexFile.ChunkIndex ) );
 
             var synonyms = index.GetByteSpanAt<SqPackIndexSynonymEntry<uint>>( header.SynonymData.Offset, header.SynonymData.Size );
             var synonymTable = new Dictionary<string, SqPackValue>( synonyms.Length );
@@ -125,7 +136,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
                 if( entry.Hash == uint.MaxValue )
                     break;
 
-                entryTable.Remove( unchecked((int)entry.Hash) );
+                entryTable.Remove( entry.Hash );
 
                 var path = entry.Path;
                 if( string.IsNullOrWhiteSpace( path ) )
@@ -159,13 +170,22 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
 
     private readonly record struct SqPackValue( SqPackIndexTableEntry Data, byte ChunkIdx );
 
-    private MappedFile GetMappedFile( SqPackKey key, byte chunkIdx, byte datFile ) =>
-        OpenedFiles.GetOrAdd( (key, chunkIdx, datFile), _ => {
-            var directory = Repositories.First( x => x.ExpansionId == key.ExpansionId ).Path;
-            var baseName = $"{(byte)key.Category:x02}{key.ExpansionId:x02}{chunkIdx:x02}.{GameData.Options.CurrentPlatform.GetName()}.dat{datFile}";
-            
-            return new( System.IO.Path.Combine( directory.FullName, baseName ) );
-        } );
+    private MappedFile GetMappedFile( SqPackKey key, byte chunkIdx, byte datFile )
+    {
+        var cacheKey = (key, chunkIdx, datFile);
+        if( OpenedFiles.TryGetValue( cacheKey, out var opened ) )
+            return opened;
+
+        var directory = Repositories.First( x => x.ExpansionId == key.ExpansionId ).Path;
+        var baseName = $"{(byte)key.Category:x02}{key.ExpansionId:x02}{chunkIdx:x02}.{GameData.Options.CurrentPlatform.GetName()}.dat{datFile}";
+        var created = new MappedFile( System.IO.Path.Combine( directory.FullName, baseName ) );
+
+        if( OpenedFiles.TryAdd( cacheKey, created ) )
+            return created;
+
+        created.Dispose();
+        return OpenedFiles[cacheKey];
+    }
 
     public bool ContainsFile( string path ) =>
         ContainsFile( HashedFilePath.Create( path, out _ ), path );
@@ -177,7 +197,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
 
         if( hashTable.TryGetValue( (int)hashedPath.PackKey, out var entries ) )
         {
-            if( entries.ContainsKey( unchecked((int)hashedPath.Hash) ) )
+            if( entries.ContainsKey( hashedPath.Hash ) )
                 return true;
         }
 
@@ -191,7 +211,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
 
         if( hashTable.TryGetValue( (int)hashedPath.PackKey, out var entries ) )
         {
-            if( entries.TryGetValue( unchecked((int)hashedPath.Hash), out var entry ) )
+            if( entries.TryGetValue( hashedPath.Hash, out var entry ) )
                 return entry;
         }
 
@@ -222,7 +242,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
             throw new FileNotFoundException( "File not found", path );
 
         var file = GetMappedFile( hashedPath.PackKey, value.ChunkIdx, value.Data.DataFileIdx );
-        return SqPackStream.Create(file, value.Data.Offset, GameData, hashedPath.OldHash );
+        return SqPackStream.Create( file, value.Data.Offset, GameData, hashedPath.OldHash );
     }
 
     public void Dispose()

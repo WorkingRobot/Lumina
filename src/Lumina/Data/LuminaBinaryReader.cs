@@ -213,7 +213,7 @@ namespace Lumina.Data
         public Span<T> ReadStructuresAsSpan<T>( int count ) where T : struct
         {
             int tSize = Unsafe.SizeOf<T>();
-            Span<byte> data = ReadBytes( tSize * count );
+            Span<byte> data = ReadBytes( tSize * count ).AsSpan();
 
             if( ConvertEndianness )
                 for( int i = 0; i < count; i++ )
@@ -225,7 +225,7 @@ namespace Lumina.Data
         private T[] ReadPrimitiveArray<T>( int count ) where T : struct
         {
             int size = Unsafe.SizeOf<T>();
-            Span<T> span = MemoryMarshal.Cast<byte, T>( ReadBytes( count * size ) );
+            Span<T> span = MemoryMarshal.Cast<byte, T>( ReadBytes( count * size ).AsSpan() );
 
             if( ConvertEndianness )
             {

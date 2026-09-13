@@ -70,20 +70,14 @@ public sealed class RepositoryInfo
             {
                 var baseName = $"{cat:x02}{ExpansionId:x02}{chunkIdx:x02}.{platform.GetName()}";
 
-                var found = false;
                 foreach( var idx in new[] { "index2", "index" } )
                 {
-                    var indexFile = $"{baseName}.{idx}";
-                    if( files.TryGetValue( indexFile, out var file ) )
+                    if( files.TryGetValue( $"{baseName}.{idx}", out var file ) )
                     {
                         yield return new( file, ExpansionId, (byte)chunkIdx, (CategoryType)cat );
-                        found = true;
                         break;
                     }
                 }
-
-                if( found )
-                    break;
             }
         }
     }

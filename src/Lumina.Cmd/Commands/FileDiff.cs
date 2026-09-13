@@ -47,7 +47,7 @@ namespace Lumina.Cmd.Commands
                     return;
                 }
 
-                if( oldMeta.Value.RawFileSize != newMeta.Value.RawFileSize )
+                if( oldMeta.Value.UncompressedFileSize != newMeta.Value.UncompressedFileSize )
                 {
                     co.WriteLine( $"size mismatch: {path}" );
                     return;

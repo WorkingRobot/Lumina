@@ -2,11 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Hashing;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading;
 using Lumina.Data;
+using Lumina.Data.Structs.SqPack;
 using Lumina.Excel;
 using Lumina.Excel.Exceptions;
 
@@ -228,6 +226,17 @@ namespace Lumina
             file.LoadFile();
 
             return file;
+        }
+
+        /// <summary>
+        /// Returns file metadata pulled directly from the file header inside the SqPack
+        /// </summary>
+        /// <param name="path">A path to a file located inside the game's filesystem</param>
+        /// <returns>A <see cref="SqPackFileHeader"/> if it was found, <see langword="null"/> if not</returns>
+        public SqPackFileHeader? GetFileMetadata( string path )
+        {
+            using var stream = Vfs.TryGetFileStream( path );
+            return stream?.Header;
         }
 
         /// <summary>

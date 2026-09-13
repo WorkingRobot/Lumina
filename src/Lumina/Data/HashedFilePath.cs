@@ -6,9 +6,25 @@ using static Lumina.Data.SqPackVfs;
 
 namespace Lumina.Data;
 
-public readonly record struct HashedFilePath( byte ExpansionId, CategoryType Category, uint Hash, ulong OldHash )
+public readonly record struct HashedFilePath( byte ExpansionId, CategoryType Category, uint Hash, int FolderSeparator, string Path )
 {
     internal readonly SqPackKey PackKey => new( ExpansionId, Category );
+
+    /// <summary>
+    /// The old hash of the file path, computed on demand. This is the same hash that's used for resolving RSFs.
+    /// </summary>
+    public ulong OldHash
+    {
+        get
+        {
+            Span<byte> pathBytes = stackalloc byte[240];
+            var folderData = pathBytes[..Encoding.UTF8.GetBytes( Path.AsSpan( ..FolderSeparator ), pathBytes )];
+            var folderHash = ~Crc32.HashToUInt32( folderData );
+            var fileData = pathBytes[..Encoding.UTF8.GetBytes( Path.AsSpan( ( FolderSeparator + 1 ).. ), pathBytes )];
+            var fileHash = ~Crc32.HashToUInt32( fileData );
+            return (ulong)folderHash << 32 | fileHash;
+        }
+    }
 
     public static HashedFilePath Create( string path, out string repository )
     {
@@ -29,28 +45,21 @@ public readonly record struct HashedFilePath( byte ExpansionId, CategoryType Cat
         string category = path[..splitOne];
         CategoryType categoryType = CategoryExtensions.GetCategoryType( category );
 
+        // only an "exN" is a repository; anything else is a folder inside ffxiv
         byte expansionId = 0;
+        repository = "ffxiv";
         int splitTwo = path.IndexOf( '/', splitOne + 1 );
         if( splitTwo != -1 )
         {
-            repository = path[( splitOne + 1 )..splitTwo];
-            if( repository.StartsWith( "ex" ) )
-                _ = byte.TryParse( repository[2..], out expansionId );
+            var segment = path[( splitOne + 1 )..splitTwo];
+            if( segment.StartsWith( "ex" ) && byte.TryParse( segment[2..], out expansionId ) )
+                repository = segment;
         }
-        else
-            repository = "ffxiv";
 
         Span<byte> pathBytes = stackalloc byte[240];
         Span<byte> pathData = pathBytes[..Encoding.UTF8.GetBytes( path, pathBytes )];
         uint hash = ~Crc32.HashToUInt32( pathData );
 
-        int folderSeparator = path.LastIndexOf( '/' );
-        Span<byte> folderData = pathBytes[..Encoding.UTF8.GetBytes( path.AsSpan( ..folderSeparator ), pathBytes )];
-        uint folderHash = ~Crc32.HashToUInt32( folderData );
-        Span<byte> fileData = pathBytes[..Encoding.UTF8.GetBytes( path.AsSpan( ( folderSeparator + 1 ).. ), pathBytes )];
-        uint fileHash = ~Crc32.HashToUInt32( fileData );
-        ulong oldHash = (ulong)folderHash << 32 | fileHash;
-
-        return new( expansionId, categoryType, hash, oldHash );
+        return new( expansionId, categoryType, hash, path.LastIndexOf( '/' ), path );
     }
 }
