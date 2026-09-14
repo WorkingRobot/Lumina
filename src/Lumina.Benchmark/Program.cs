@@ -7,8 +7,10 @@ internal static class Program
 {
     static void Main( string[] args )
     {
-        //BenchmarkDotNet.Running.BenchmarkSwitcher.FromAssembly( typeof( Program ).Assembly ).Run( args );
-        Console.ReadLine();
+        BenchmarkDotNet.Running.BenchmarkSwitcher.FromAssembly( typeof( Program ).Assembly ).Run( args );
+        if( args.Length > 0 )
+            return;
+
         GameData gd = CreateGameData();
 
         Console.WriteLine( $"{gd.GetFile<ExcelListFile>( "exd/root.exl" ).ExdMap["PreHandler"]}" );
@@ -31,12 +33,18 @@ internal static class Program
         Console.ReadLine();
     }
 
+    private static readonly string[] SearchPaths = [
+        @"J:\Programs\Steam\steamapps\common\FINAL FANTASY XIV Online\game\sqpack",
+        @"C:\Program Files (x86)\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game\sqpack",
+        Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.UserProfile ), ".xlcore", "ffxiv", "game", "sqpack" ),
+    ];
+
     public static GameData CreateGameData()
     {
-        return new( @"J:\Programs\Steam\steamapps\common\FINAL FANTASY XIV Online\game\sqpack", new LuminaOptions()
+        return new( Array.Find( SearchPaths, Directory.Exists ) ?? throw new DirectoryNotFoundException( "No game installation found" ),
+            new LuminaOptions()
         {
             PanicOnSheetChecksumMismatch = false,
-            Logger = new ConsoleLogger(),
             RsfResolver = ResolveRsf
         } );
     }
