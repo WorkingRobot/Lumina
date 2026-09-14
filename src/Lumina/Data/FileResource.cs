@@ -23,6 +23,25 @@ namespace Lumina.Data
         }
 
         /// <summary>
+        /// Parses a file from its raw, decompressed bytes.
+        /// </summary>
+        /// <remarks>
+        /// Consumers that already hold a file's contents, such as tools reading modified files from disk,
+        /// would otherwise have to initialize a whole <see cref="GameData"/> to parse them.
+        /// </remarks>
+        /// <param name="data">The raw, decompressed contents of the file.</param>
+        /// <param name="platform">The platform the file was made for.</param>
+        /// <typeparam name="T">The type of <see cref="FileResource"/> to parse as.</typeparam>
+        /// <returns>The parsed file.</returns>
+        public static T FromBytes< T >( ReadOnlyMemory< byte > data, PlatformType platform = PlatformType.Win32 )
+            where T : FileResource, new()
+        {
+            var file = new T { Reader = new LuminaBinaryReader( data, platform ) };
+            file.LoadFile();
+            return file;
+        }
+
+        /// <summary>
         /// Information about the file from the game data, includes information copied from the file header such as size, block count and etc.
         /// </summary>
         [Obsolete( "Use SqPackStream.Header, and cast to SqPackStream subtypes for more informational headers." )]
@@ -33,13 +52,14 @@ namespace Lumina.Data
         /// </summary>
         [Obsolete( "Refrain from using byte accessors and use the underlying stream." )]
         public byte[] Data => data.Value;
-        private readonly Lazy<byte[]> data;
+
+        private readonly Lazy< byte[] > data;
 
         /// <summary>
         /// A span of the file <see cref="Data"/>.
         /// </summary>
-        [Obsolete("Refrain from using byte accessors and use the underlying stream.")]
-        public Span<byte> DataSpan => Data.AsSpan();
+        [Obsolete( "Refrain from using byte accessors and use the underlying stream." )]
+        public Span< byte > DataSpan => Data.AsSpan();
 
         /// <summary>
         /// A stream to access the file data. Should only be used for reading data, writing shouldn't be done directly to a <see cref="FileResource"/>

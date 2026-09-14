@@ -11,20 +11,35 @@ public sealed class SqPackStandardStream : SqPackStream
 
 
     private MappedFile.Segment< SqPackStandardBlockDescriptor > StandardBlockDescriptors { get; }
+
+    /// Endian-swapped copies of the descriptors, only for big-endian streams.
+    private readonly SqPackStandardBlockDescriptor[]? swappedDescriptors;
+
     private long[]? BlockStartPositions { get; }
     private ushort? UniformBlockUncompressedSize { get; }
 
-    public SqPackStandardStream( MappedFile datFile, long offset ) : base( datFile, offset )
+    public SqPackStandardStream( MappedFile datFile, long offset, bool bigEndian = false )
+        : base( datFile, offset, bigEndian )
     {
         Header = datFile.GetAt< SqPackFileStandardHeader >( offset );
+        if( bigEndian )
+            Header = Header.ReverseEndianness();
         StandardBlockDescriptors = DatFile.GetSpanAt< SqPackStandardBlockDescriptor >(
             Offset + Unsafe.SizeOf< SqPackFileStandardHeader >(), checked( (int)Header.BlockCount ) );
+
+        if( bigEndian )
+        {
+            swappedDescriptors = new SqPackStandardBlockDescriptor[StandardBlockDescriptors.Length];
+            for( var i = 0; i < swappedDescriptors.Length; i++ )
+                swappedDescriptors[ i ] = StandardBlockDescriptors.Span[ i ].ReverseEndianness();
+        }
+
         BlockStartPositions = new long[StandardBlockDescriptors.Length];
         long pos = 0;
         for( int i = 0; i < StandardBlockDescriptors.Length; ++i )
         {
             BlockStartPositions[ i ] = pos;
-            ushort uncompSize = StandardBlockDescriptors.Span[ i ].UncompressedSize;
+            ushort uncompSize = Descriptors[ i ].UncompressedSize;
             pos += uncompSize;
             if( i == 0 )
                 UniformBlockUncompressedSize = uncompSize;
@@ -37,13 +52,16 @@ public sealed class SqPackStandardStream : SqPackStream
             BlockStartPositions = null;
     }
 
+    private ReadOnlySpan< SqPackStandardBlockDescriptor > Descriptors =>
+        swappedDescriptors ?? StandardBlockDescriptors.Span;
+
     private protected override BlockData? GetCurrentBlock()
     {
         if( !BlockInfo.HasValue )
         {
             if( StandardBlockDescriptors.Length <= BlockIndex )
                 return null;
-            BlockInfo = GetBlock( StandardBlockDescriptors.Span[ BlockIndex ].Offset );
+            BlockInfo = GetBlock( Descriptors[ BlockIndex ].Offset );
         }
 
         return BlockInfo.Value;

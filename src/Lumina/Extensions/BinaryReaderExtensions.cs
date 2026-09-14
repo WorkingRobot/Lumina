@@ -1,4 +1,5 @@
 using System;
+using Lumina.Data;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -134,6 +135,21 @@ namespace Lumina.Extensions
             var data = br.ReadBytes( length );
             br.BaseStream.Position = pos;
             return data;
+        }
+
+        /// <summary>
+        /// Reads raw data at an offset, without copying it when the reader sits on a mapped SqPack block.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="offset">The offset to read from.</param>
+        /// <param name="length">The number of bytes to read.</param>
+        /// <returns>The data at the given offset.</returns>
+        public static ReadOnlyMemory<byte> ReadRawOffsetMemory( this BinaryReader br, long offset, int length )
+        {
+            if( br.BaseStream is SqPackStream sqpack && sqpack.TryGetMappedMemory( offset, length ) is { } mapped )
+                return mapped;
+
+            return br.ReadRawOffsetData( offset, length );
         }
 
         /// <summary>

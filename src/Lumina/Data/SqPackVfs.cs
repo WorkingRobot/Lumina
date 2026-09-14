@@ -3,6 +3,7 @@ using Lumina.Data.Structs.SqPack;
 using Lumina.Extensions;
 using Lumina.Misc;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
@@ -72,6 +73,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
         var hashTable = new Dictionary< CategoryType, Dictionary< uint, SqPackValue > >();
         var synonymData = new List< Dictionary< string, SqPackValue > >();
 
+        var bigEndian = GameData.Options.CurrentPlatform == PlatformType.PS3;
         var indexFiles = repo.GetIndexFiles( GameData.Options.CurrentPlatform ).ToList();
         var capacities = new Dictionary< CategoryType, int >();
         foreach( var indexFile in indexFiles )
@@ -89,11 +91,11 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
                 taskOrder[ key ] = dependentTask.ContinueWith(
                     t => {
                         t.GetAwaiter().GetResult();
-                        return Task.Run( () => AddIndex( indexFile, dict ) );
+                        return Task.Run( () => AddIndex( indexFile, dict, bigEndian ) );
                     },
                     TaskContinuationOptions.ExecuteSynchronously ).Unwrap();
             else
-                taskOrder[ key ] = Task.Run( () => AddIndex( indexFile, dict ) );
+                taskOrder[ key ] = Task.Run( () => AddIndex( indexFile, dict, bigEndian ) );
         }
 
         var tasks = taskOrder.Values.ToList();
@@ -132,14 +134,19 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
         Dictionary< string, SqPackValue > Synonyms,
         IndexFileInfo IndexFile );
 
-    private static IndexData AddIndex( IndexFileInfo indexFile, Dictionary< uint, SqPackValue > entryTable )
+    private static IndexData AddIndex( IndexFileInfo indexFile, Dictionary< uint, SqPackValue > entryTable,
+        bool bigEndian )
     {
         using var index = new MappedFile( indexFile.File );
         index.Prefetch( 0, index.Size );
 
-        ref readonly var fileHeader = ref index.GetAt< SqPackHeader >( 0 );
+        var fileHeader = index.GetAt< SqPackHeader >( 0 );
+        if( bigEndian )
+            fileHeader = fileHeader.ReverseEndianness();
 
-        ref readonly var header = ref index.GetAt< SqPackIndexHeader >( fileHeader.Size );
+        var header = index.GetAt< SqPackIndexHeader >( fileHeader.Size );
+        if( bigEndian )
+            header = header.ReverseEndianness();
 
         // It can be added trivially, but there's no reason to do so since index2 already exists everywhere.
         if( header.IndexType == 0 )
@@ -153,7 +160,14 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
             var entries =
                 index.GetByteSpanAt< SqPackIndexTablePair< uint > >( header.IndexData.Offset, header.IndexData.Size );
             foreach( var entry in entries.Span )
-                entryTable.TryAdd( entry.Hash, new( entry.Data, indexFile.ChunkIndex ) );
+            {
+                // swapping here keeps the table and lookups endianness agnostic
+                var hash = bigEndian ? BinaryPrimitives.ReverseEndianness( entry.Hash ) : entry.Hash;
+                var data = bigEndian
+                    ? new SqPackIndexTableEntry { Data = BinaryPrimitives.ReverseEndianness( entry.Data.Data ) }
+                    : entry.Data;
+                entryTable.TryAdd( hash, new( data, indexFile.ChunkIndex ) );
+            }
 
             var synonyms =
                 index.GetByteSpanAt< SqPackIndexSynonymEntry< uint > >( header.SynonymData.Offset,
@@ -161,16 +175,19 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
             var synonymTable = new Dictionary< string, SqPackValue >( synonyms.Length );
             foreach( var entry in synonyms.Span )
             {
-                if( entry.Hash == uint.MaxValue )
+                var synonymHash = bigEndian ? BinaryPrimitives.ReverseEndianness( entry.Hash ) : entry.Hash;
+                if( synonymHash == uint.MaxValue )
                     break;
 
-                entryTable.Remove( entry.Hash );
+                entryTable.Remove( synonymHash );
 
                 var path = entry.Path;
                 if( string.IsNullOrWhiteSpace( path ) )
                     throw new InvalidDataException( "Synonym entry has no path." );
 
-                synonymTable.Add( path, new( entry.Data, indexFile.ChunkIndex ) );
+                synonymTable.Add( path, new( bigEndian
+                    ? new SqPackIndexTableEntry { Data = BinaryPrimitives.ReverseEndianness( entry.Data.Data ) }
+                    : entry.Data, indexFile.ChunkIndex ) );
             }
 
             return new( entryTable, synonymTable, indexFile );

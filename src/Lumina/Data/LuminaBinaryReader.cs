@@ -2,12 +2,11 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using DotNext;
+using DotNext.IO;
 
 namespace Lumina.Data
 {
@@ -23,19 +22,23 @@ namespace Lumina.Data
             set => BaseStream.Position = value;
         }
 
-        public LuminaBinaryReader( byte[] array, PlatformType platformId = PlatformType.Win32, GameData? gameData = null ) : this( new MemoryStream( array, false ), Encoding.UTF8, false, platformId )
+        public LuminaBinaryReader( ReadOnlyMemory< byte > array, PlatformType platformId = PlatformType.Win32 ) : this(
+            array.AsStream(), Encoding.UTF8, false, platformId )
         {
         }
 
-        public LuminaBinaryReader( Stream stream, PlatformType platformId = PlatformType.Win32 ) : this( stream, Encoding.UTF8, false, platformId )
+        public LuminaBinaryReader( Stream stream, PlatformType platformId = PlatformType.Win32 ) : this( stream,
+            Encoding.UTF8, false, platformId )
         {
         }
 
-        public LuminaBinaryReader( Stream stream, Encoding encoding, PlatformType platformId ) : this( stream, encoding, false, platformId )
+        public LuminaBinaryReader( Stream stream, Encoding encoding, PlatformType platformId ) : this( stream, encoding,
+            false, platformId )
         {
         }
 
-        public LuminaBinaryReader( Stream stream, Encoding encoding, bool leaveOpen, PlatformType platformId ) : base( stream, encoding, leaveOpen )
+        public LuminaBinaryReader( Stream stream, Encoding encoding, bool leaveOpen, PlatformType platformId ) : base(
+            stream, encoding, leaveOpen )
         {
             Platform = platformId;
             IsLittleEndian = platformId != PlatformType.PS3;
@@ -88,57 +91,57 @@ namespace Lumina.Data
 
         public sbyte[] ReadSByteArray( int count )
         {
-            return ReadPrimitiveArray<sbyte>( count );
+            return ReadPrimitiveArray< sbyte >( count );
         }
 
         public bool[] ReadBooleanArray( int count )
         {
-            return ReadPrimitiveArray<bool>( count );
+            return ReadPrimitiveArray< bool >( count );
         }
 
         public short[] ReadInt16Array( int count )
         {
-            return ReadPrimitiveArray<short>( count );
+            return ReadPrimitiveArray< short >( count );
         }
 
         public ushort[] ReadUInt16Array( int count )
         {
-            return ReadPrimitiveArray<ushort>( count );
+            return ReadPrimitiveArray< ushort >( count );
         }
 
         public int[] ReadInt32Array( int count )
         {
-            return ReadPrimitiveArray<int>( count );
+            return ReadPrimitiveArray< int >( count );
         }
 
         public uint[] ReadUInt32Array( int count )
         {
-            return ReadPrimitiveArray<uint>( count );
+            return ReadPrimitiveArray< uint >( count );
         }
 
         public long[] ReadInt64Array( int count )
         {
-            return ReadPrimitiveArray<long>( count );
+            return ReadPrimitiveArray< long >( count );
         }
 
         public ulong[] ReadUInt64Array( int count )
         {
-            return ReadPrimitiveArray<ulong>( count );
+            return ReadPrimitiveArray< ulong >( count );
         }
 
         public Half[] ReadHalfArray( int count )
         {
-            return ReadPrimitiveArray<Half>( count );
+            return ReadPrimitiveArray< Half >( count );
         }
 
         public float[] ReadSingleArray( int count )
         {
-            return ReadPrimitiveArray<float>( count );
+            return ReadPrimitiveArray< float >( count );
         }
 
         public double[] ReadDoubleArray( int count )
         {
-            return ReadPrimitiveArray<double>( count );
+            return ReadPrimitiveArray< double >( count );
         }
 
         /// <summary>
@@ -146,20 +149,20 @@ namespace Lumina.Data
         /// </summary>
         /// <typeparam name="T">The structure to read in to</typeparam>
         /// <returns>The file data as a structure</returns>
-        public T ReadStructure<T>() where T : struct
+        public T ReadStructure< T >() where T : struct
         {
-            byte[] data = ReadBytes( Unsafe.SizeOf<T>() );
+            byte[] data = ReadBytes( Unsafe.SizeOf< T >() );
 
             if( ConvertEndianness )
                 ConvertEndian( typeof( T ), data );
 
-            T structure = MemoryMarshal.Read<T>( data );
+            T structure = MemoryMarshal.Read< T >( data );
 
             return structure;
         }
 
         // this is fucked but it's better than forcing a convert method on every structure ever
-        private static void ConvertEndian( Type type, Span<byte> data, int startOffset = 0 )
+        private static void ConvertEndian( Type type, Span< byte > data, int startOffset = 0 )
         {
             int offset = 0;
             foreach( FieldInfo field in type.GetFields( BindingFlags.Instance | BindingFlags.Public ) )
@@ -188,9 +191,9 @@ namespace Lumina.Data
         /// <param name="count">The number of T to read from the stream</param>
         /// <typeparam name="T">The structure to read in to</typeparam>
         /// <returns>A list containing the structures read from the stream</returns>
-        public List<T> ReadStructures<T>( int count ) where T : struct
+        public List< T > ReadStructures< T >( int count ) where T : struct
         {
-            return [.. ReadStructuresAsSpan<T>( count )];
+            return [.. ReadStructuresAsSpan< T >( count )];
         }
 
         /// <summary>
@@ -199,9 +202,9 @@ namespace Lumina.Data
         /// <param name="count">The number of T to read from the stream</param>
         /// <typeparam name="T">The structure to read in to</typeparam>
         /// <returns>An array containing the structures read from the stream</returns>
-        public T[] ReadStructuresAsArray<T>( int count ) where T : struct
+        public T[] ReadStructuresAsArray< T >( int count ) where T : struct
         {
-            return [.. ReadStructuresAsSpan<T>( count )];
+            return [.. ReadStructuresAsSpan< T >( count )];
         }
 
         /// <summary>
@@ -210,22 +213,22 @@ namespace Lumina.Data
         /// <param name="count">The number of T to read from the stream</param>
         /// <typeparam name="T">The structure to read in to</typeparam>
         /// <returns>A span containing the structures read from the stream</returns>
-        public Span<T> ReadStructuresAsSpan<T>( int count ) where T : struct
+        public Span< T > ReadStructuresAsSpan< T >( int count ) where T : struct
         {
-            int tSize = Unsafe.SizeOf<T>();
-            Span<byte> data = ReadBytes( tSize * count ).AsSpan();
+            int tSize = Unsafe.SizeOf< T >();
+            Span< byte > data = ReadBytes( tSize * count ).AsSpan();
 
             if( ConvertEndianness )
                 for( int i = 0; i < count; i++ )
                     ConvertEndian( typeof( T ), data, tSize * i );
 
-            return MemoryMarshal.Cast<byte, T>( data );
+            return MemoryMarshal.Cast< byte, T >( data );
         }
 
-        private T[] ReadPrimitiveArray<T>( int count ) where T : struct
+        private T[] ReadPrimitiveArray< T >( int count ) where T : struct
         {
-            int size = Unsafe.SizeOf<T>();
-            Span<T> span = MemoryMarshal.Cast<byte, T>( ReadBytes( count * size ).AsSpan() );
+            int size = Unsafe.SizeOf< T >();
+            Span< T > span = MemoryMarshal.Cast< byte, T >( ReadBytes( count * size ).AsSpan() );
 
             if( ConvertEndianness )
             {
@@ -235,17 +238,17 @@ namespace Lumina.Data
                         break;
 
                     case 2:
-                        Span<short> span2 = MemoryMarshal.Cast<T, short>( span );
+                        Span< short > span2 = MemoryMarshal.Cast< T, short >( span );
                         BinaryPrimitives.ReverseEndianness( span2, span2 );
                         break;
 
                     case 4:
-                        Span<int> span4 = MemoryMarshal.Cast<T, int>( span );
+                        Span< int > span4 = MemoryMarshal.Cast< T, int >( span );
                         BinaryPrimitives.ReverseEndianness( span4, span4 );
                         break;
 
                     case 8:
-                        Span<long> span8 = MemoryMarshal.Cast<T, long>( span );
+                        Span< long > span8 = MemoryMarshal.Cast< T, long >( span );
                         BinaryPrimitives.ReverseEndianness( span8, span8 );
                         break;
                 }

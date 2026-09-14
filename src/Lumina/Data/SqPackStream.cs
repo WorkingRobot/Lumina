@@ -20,12 +20,17 @@ public abstract class SqPackStream : Stream
     public override bool CanWrite => false;
     public override long Length => Header.UncompressedFileSize;
 
-    protected internal SqPackStream( MappedFile datFile, long offset )
+    private protected readonly bool BigEndian;
+
+    protected internal SqPackStream( MappedFile datFile, long offset, bool bigEndian = false )
     {
         datFile.AddReference();
         DatFile = datFile;
         Offset = offset;
-        Header = datFile.GetAt< SqPackFileHeader >( offset );
+        BigEndian = bigEndian;
+        Header = bigEndian
+            ? datFile.GetAt< SqPackFileHeader >( offset ).ReverseEndianness()
+            : datFile.GetAt< SqPackFileHeader >( offset );
     }
 
     private int _disposed;
@@ -42,6 +47,8 @@ public abstract class SqPackStream : Stream
     {
         var blockOffset = Offset + Header.HeaderSize + offset;
         var blockHeader = DatFile.GetAt< SqPackBlockHeader >( blockOffset );
+        if( BigEndian )
+            blockHeader = blockHeader.ReverseEndianness();
         if( blockHeader.DataSize == 0 )
             throw new InvalidOperationException( "Empty block" );
 
@@ -210,11 +217,15 @@ public abstract class SqPackStream : Stream
     public static SqPackStream Create( MappedFile datFile, long offset, GameData gameData,
         in HashedFilePath hashedPath )
     {
-        ref readonly SqPackFileHeader header = ref datFile.GetAt< SqPackFileHeader >( offset );
+        var bigEndian = gameData.Options.CurrentPlatform == PlatformType.PS3;
+        var header = datFile.GetAt< SqPackFileHeader >( offset );
+        if( bigEndian )
+            header = header.ReverseEndianness();
+
         return header.Type switch
         {
             SqPackFileType.Empty => new SqPackEmptyStream( datFile, offset, gameData, hashedPath.OldHash ),
-            SqPackFileType.Standard => new SqPackStandardStream( datFile, offset ),
+            SqPackFileType.Standard => new SqPackStandardStream( datFile, offset, bigEndian ),
             SqPackFileType.Model => new SqPackModelStream( datFile, offset ),
             SqPackFileType.Texture => new SqPackTextureStream( datFile, offset ),
             _ => throw new InvalidDataException( "Invalid header type" )
