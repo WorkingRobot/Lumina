@@ -9,7 +9,7 @@ namespace Lumina.Data.Parsing.Tex
         public static int GetStorageRequirements( int width, int height, SquishOptions flags )
         {
             var blockCount = ( ( width + 3 ) / 4 ) * ( ( height + 3 ) / 4 );
-            var blockSize = flags.HasFlag( SquishOptions.DXT1 ) ? 8 : 16;
+            var blockSize = ( flags & SquishOptions.DXT1 ) != 0 ? 8 : 16;
             return blockCount * blockSize;
         }
 
@@ -27,6 +27,13 @@ namespace Lumina.Data.Parsing.Tex
 
         public static byte[] DecompressBlock( byte[] block, int blockOffset, SquishOptions flags )
         {
+            var rgba = new byte[ 4 * 16 ];
+            DecompressBlock( block, blockOffset, flags, rgba );
+            return rgba;
+        }
+
+        private static void DecompressBlock( byte[] block, int blockOffset, SquishOptions flags, Span< byte > rgba )
+        {
             // Get the block locations
             var colOff = blockOffset;
             var alphaOff = blockOffset;
@@ -34,15 +41,13 @@ namespace Lumina.Data.Parsing.Tex
                 colOff += 8;
 
             // Decompress colour.
-            var rgba = ColourBlock.DecompressColour( block, colOff, flags.HasFlag( SquishOptions.DXT1 ) );
+            ColourBlock.DecompressColour( block, colOff, ( flags & SquishOptions.DXT1 ) != 0, rgba );
 
             // Decompress alpha seperately if necessary.
-            if( flags.HasFlag( SquishOptions.DXT3 ) )
+            if( ( flags & SquishOptions.DXT3 ) != 0 )
                 Alpha.DecompressAlphaDxt3( block, alphaOff, rgba, 0 );
-            else if( flags.HasFlag( SquishOptions.DXT5 ) )
+            else if( ( flags & SquishOptions.DXT5 ) != 0 )
                 Alpha.DecompressAlphaDxt5( block, alphaOff, rgba, 0 );
-
-            return rgba;
         }
 
         public static byte[] CompressImage( byte[] rgba, int width, int height, SquishOptions flags )
@@ -57,9 +62,17 @@ namespace Lumina.Data.Parsing.Tex
 
         public static byte[] DecompressImage( byte[] blocks, int offset, int width, int height, SquishOptions flags )
         {
-            var argb = new byte[4 * width * height];
-            var bytesPerBlock = flags.HasFlag( SquishOptions.DXT1 ) ? 8 : 16;
+            var argb = new byte[ 4 * width * height ];
+            DecompressImage( blocks, offset, width, height, flags, argb );
+            return argb;
+        }
 
+        public static void DecompressImage( byte[] blocks, int offset, int width, int height, SquishOptions flags,
+            Span< byte > argb )
+        {
+            var bytesPerBlock = ( flags & SquishOptions.DXT1 ) != 0 ? 8 : 16;
+
+            Span< byte > targetRgba = stackalloc byte[ 4 * 16 ];
             var blockOffset = offset;
             // Loop over blocks.
             for( int y = 0; y < height; y += 4 )
@@ -67,7 +80,7 @@ namespace Lumina.Data.Parsing.Tex
                 for( int x = 0; x < width; x += 4 )
                 {
                     // Decompress the block.
-                    var targetRgba = DecompressBlock( blocks, blockOffset, flags );
+                    DecompressBlock( blocks, blockOffset, flags, targetRgba );
 
                     // Write the decompressed pixels to the correct image locations.
                     var sourcePixelOffset = 0;
@@ -96,8 +109,6 @@ namespace Lumina.Data.Parsing.Tex
                     blockOffset += bytesPerBlock;
                 }
             }
-
-            return argb;
         }
 
         #endregion

@@ -53,19 +53,13 @@ namespace Lumina.Data.Parsing.Tex.Buffers
             var cbPlane = CalculateNumBytesPerPlane( width, height );
             for( var i = 0; i < depth; i++ )
             {
-                var dec = Squish.DecompressImage( RawData, sourceOffset + cbPlane * i, width, height, _version switch
+                Squish.DecompressImage( RawData, sourceOffset + cbPlane * i, width, height, _version switch
                 {
                     1 => SquishOptions.DXT1,
                     2 => SquishOptions.DXT3,
                     3 => SquishOptions.DXT5,
                     _ => throw new NotSupportedException( "Decoding BC5/BC7 data is currently not supported." ),
-                }  );
-                Array.Copy(
-                    dec,
-                    0,
-                    buffer,
-                    destOffset + width * height * 4 * i,
-                    dec.Length );
+                }, buffer.AsSpan( destOffset + width * height * 4 * i, width * height * 4 ) );
             }
         }
 

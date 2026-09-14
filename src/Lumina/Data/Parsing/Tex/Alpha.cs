@@ -44,7 +44,7 @@ namespace Lumina.Data.Parsing.Tex
             }
         }
 
-        public static void DecompressAlphaDxt3( byte[] block, int blockOffset, byte[] target, int targetOffset )
+        public static void DecompressAlphaDxt3( ReadOnlySpan< byte > block, int blockOffset, Span< byte > target, int targetOffset )
         {
             // Unpack the alpha values pairwise.
             for( int i = 0; i < 8; ++i )
@@ -263,7 +263,7 @@ namespace Lumina.Data.Parsing.Tex
                 WriteAlphaBlock7( min7, max7, indices7, target, targetOffset );
         }
 
-        public static void DecompressAlphaDxt5( byte[] block, int blockOffset, byte[] target, int targetOffset )
+        public static void DecompressAlphaDxt5( ReadOnlySpan< byte > block, int blockOffset, Span< byte > target, int targetOffset )
         {
             // Get the two alpha values.
             var alpha0 = block[ blockOffset + 0 ];

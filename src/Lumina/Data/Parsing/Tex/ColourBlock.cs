@@ -1,12 +1,15 @@
+using System;
+
 namespace Lumina.Data.Parsing.Tex
 {
     // From DotSquish
     internal static class ColourBlock
     {
-        private static int Unpack565( byte[] packed, int packedOffset, byte[] colour, int colourOffset )
+        private static int Unpack565( ReadOnlySpan< byte > packed, int packedOffset, Span< byte > colour,
+            int colourOffset )
         {
             // Build the packed value.
-            var value = (int)packed[ packedOffset ] | ( (int)packed[ packedOffset + 1 ] << 8 );
+            var value = packed[ packedOffset ] | ( packed[ packedOffset + 1 ] << 8 );
 
             // Get the components in the stored range.
             var red = (byte)( ( value >> 11 ) & 0x1F );
@@ -22,10 +25,11 @@ namespace Lumina.Data.Parsing.Tex
             return value;
         }
 
-        public static byte[] DecompressColour( byte[] block, int blockOffset, bool isDxt1 )
+        public static void DecompressColour( ReadOnlySpan< byte > block, int blockOffset, bool isDxt1,
+            Span< byte > rgba )
         {
             // Unpack the endpoints
-            var codes = new byte[16];
+            Span< byte > codes = stackalloc byte[16];
             var a = Unpack565( block, blockOffset + 0, codes, 0 );
             var b = Unpack565( block, blockOffset + 2, codes, 4 );
 
@@ -52,7 +56,7 @@ namespace Lumina.Data.Parsing.Tex
             codes[ 12 + 3 ] = (byte)( ( isDxt1 && a <= b ) ? 0 : 255 );
 
             // Unpack the indices
-            var indices = new byte[16];
+            Span< byte > indices = stackalloc byte[16];
             for( int i = 0; i < 4; i++ )
             {
                 var packed = block[ blockOffset + 4 + i ];
@@ -64,15 +68,12 @@ namespace Lumina.Data.Parsing.Tex
             }
 
             // Store the colours
-            var rgba = new byte[4 * 16];
             for( int i = 0; i < 16; ++i )
             {
                 var offset = 4 * indices[ i ];
                 for( int j = 0; j < 4; ++j )
                     rgba[ 4 * i + j ] = codes[ offset + j ];
             }
-
-            return rgba;
         }
     }
 }
