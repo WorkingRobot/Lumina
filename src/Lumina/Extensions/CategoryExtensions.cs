@@ -27,6 +27,15 @@ public static class CategoryExtensions
         };
 
     public static CategoryType GetCategoryType( string name ) =>
+        GetCategoryType( name.AsSpan() );
+
+    /// <summary>
+    /// Returns the <see cref="CategoryType"/> corresponding to the given category name.
+    /// </summary>
+    /// <param name="name">The category name to convert to a <see cref="CategoryType"/>.</param>
+    /// <returns>The <see cref="CategoryType"/> corresponding to the given category name.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if the given category name does not correspond to a valid <see cref="CategoryType"/>.</exception>
+    public static CategoryType GetCategoryType( ReadOnlySpan< char > name ) =>
         name switch
         {
             "common" => CategoryType.Common,
@@ -44,6 +53,6 @@ public static class CategoryExtensions
             "music" => CategoryType.Music,
             "sqpack_test" => CategoryType.SqpackTest,
             "debug" => CategoryType.Debug,
-            _ => throw new ArgumentOutOfRangeException( nameof( name ), name, null ),
+            _ => throw new ArgumentOutOfRangeException( nameof( name ), name.ToString(), null ),
         };
 }

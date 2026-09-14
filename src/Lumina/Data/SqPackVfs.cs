@@ -24,7 +24,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
     public delegate bool ResolveRsfDelegate( ulong indexHash, out ReadOnlyMemory< byte > resolvedData );
 
     // (Expansion, Category) + Hash -> DataFile, ChunkIdx, Offset
-    private FrozenDictionary< int, FrozenDictionary< uint, SqPackValue > >? HashTable { get; set; }
+    private FrozenDictionary< int, HashLookup< SqPackValue > >? HashTable { get; set; }
     private FrozenDictionary< string, SqPackValue >? CollisionTable { get; set; }
 
     private ConcurrentDictionary< (SqPackKey Key, byte ChunkIdx, byte DatFile), MappedFile > OpenedFiles { get; } =
@@ -38,7 +38,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
 
         var tasks = Path.GetDirectories().Select( AddRepository ).ToList();
 
-        var hashTable = new Dictionary< int, FrozenDictionary< uint, SqPackValue > >();
+        var hashTable = new Dictionary< int, HashLookup< SqPackValue > >();
         var synonymData = new List< Dictionary< string, SqPackValue > >();
         while( tasks.Count != 0 )
         {
@@ -61,7 +61,7 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
 
     private readonly record struct RepositoryData(
         byte ExpansionId,
-        Dictionary< CategoryType, FrozenDictionary< uint, SqPackValue > > HashTables,
+        Dictionary< CategoryType, HashLookup< SqPackValue > > HashTables,
         List< Dictionary< string, SqPackValue > > Synonyms );
 
     private async Task< RepositoryData > AddRepository( DirectoryInfo repositoryPath )
@@ -108,8 +108,23 @@ public sealed class SqPackVfs( GameData gameData ) : IDisposable
                 synonymData.Add( synonyms );
         }
 
-        return new( repo.ExpansionId, hashTable.ToDictionary( x => x.Key, x => x.Value.ToFrozenDictionary() ),
+        return new( repo.ExpansionId, hashTable.ToDictionary( x => x.Key, x => Build( x.Value ) ),
             synonymData );
+    }
+
+    private static HashLookup< SqPackValue > Build( Dictionary< uint, SqPackValue > entries )
+    {
+        var keys = GC.AllocateUninitializedArray< uint >( entries.Count );
+        var values = GC.AllocateUninitializedArray< SqPackValue >( entries.Count );
+        var i = 0;
+        foreach( var (hash, value) in entries )
+        {
+            keys[ i ] = hash;
+            values[ i ] = value;
+            i++;
+        }
+
+        return new( keys, values );
     }
 
     private readonly record struct IndexData(
