@@ -13,12 +13,6 @@ public sealed class SqPackModelStream : SqPackStream
 {
     public new SqPackFileModelHeader Header { get; }
 
-    public override long Position { get => BytePosition; set => Seek( value, SeekOrigin.Begin ); }
-
-    private long BytePosition { get; set; }
-    private int BlockIndex { get; set; }
-    private int BlockOffset { get; set; }
-    private BlockData? BlockInfo { get; set; }
 
     private byte[] StreamHeader { get; }
     private long[] BlockOffsets { get; }
@@ -137,56 +131,12 @@ public sealed class SqPackModelStream : SqPackStream
         return blocks;
     }
 
-    public override int Read( byte[] buffer, int offset, int count )
-    {
-        Span<byte> b = buffer.AsSpan().Slice( offset, count );
-        while( !b.IsEmpty )
-        {
-            if( GetBlock() is not { } blockData )
-                break;
-            var data = blockData.Span;
-            int toCopy = Math.Min( data.Length - BlockOffset, b.Length );
-            data.Slice( BlockOffset, toCopy ).CopyTo( b );
-            b = b[toCopy..];
-
-            BlockOffset += toCopy;
-            BytePosition += toCopy;
-            if( BlockOffset >= data.Length )
-            {
-                BlockIndex++;
-                BlockOffset = 0;
-                BlockInfo = null;
-            }
-        }
-        return count - b.Length;
-    }
-
-    public override long Seek( long offset, SeekOrigin origin )
-    {
-        offset = origin switch
-        {
-            SeekOrigin.Begin => offset,
-            SeekOrigin.Current => BytePosition + offset,
-            SeekOrigin.End => Length + offset,
-            _ => throw new ArgumentOutOfRangeException( nameof( origin ) )
-        };
-
-        (int idx, BlockOffset) = ResolveBlockPosition( offset );
-        if( idx != BlockIndex )
-        {
-            BlockIndex = idx;
-            BlockInfo = null;
-        }
-
-        return BytePosition = offset;
-    }
-
-    private BlockData? GetBlock()
+    private protected override BlockData? GetCurrentBlock()
     {
         if( !BlockInfo.HasValue )
         {
             if( BlockIndex == 0 )
-                BlockInfo = new( StreamHeader );
+                BlockInfo = new( StreamHeader, StreamHeader.Length );
             else
             {
                 if( BlockOffsets.Length <= BlockIndex - 1 )
@@ -197,7 +147,7 @@ public sealed class SqPackModelStream : SqPackStream
         return BlockInfo.Value;
     }
 
-    private (int BlockIndex, int BlockOffset) ResolveBlockPosition( long offset )
+    private protected override (int BlockIndex, int BlockOffset) ResolveBlockPosition( long offset )
     {
         if( offset < StreamHeader.Length )
             return (0, (int)offset);

@@ -14,13 +14,6 @@ public class LuminaOptions
     public PlatformType CurrentPlatform { get; set; } = PlatformType.Win32;
 
     /// <summary>
-    /// If true, each loaded FileResource will have a weak reference maintained by Lumina so that sequential loads will return the pre-loaded file
-    /// in the event it hasn't been GC'd/a reference is maintained elsewhere. This is constrained by the file type used to load, so loading the
-    /// same file as a FileResource and then a TexFile will kill the old FileResource reference and replace it with a TexFile reference and miss the cache.
-    /// </summary>
-    public bool CacheFileResources { get; set; } = true;
-
-    /// <summary>
     /// The default language to fetch from Excel sheets. Can be overriden on a case-by-case basis but this serves as the default.
     /// </summary>
     public Language DefaultExcelLanguage { get; set; } = Language.English;
@@ -37,11 +30,6 @@ public class LuminaOptions
     public ExcelModule.ResolveRsvDelegate? RsvResolver { get; set; }
 
     public SqPackVfs.ResolveRsfDelegate? RsfResolver { get; set; }
-
-    /// <summary>
-    /// If enabled, resources will be loaded using multiple threads.
-    /// </summary>
-    public bool LoadMultithreaded { get; set; } = false;
 
     /// <summary>
     /// The logger that Lumina will use to log events to. If not provided, Lumina will not log anything.
